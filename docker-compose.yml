@@ -1,0 +1,22 @@
+consul:
+    command: -server -bootstrap -ui-dir /ui
+    image: progrium/consul:latest
+    ports:
+    - 53:53
+    - 8300:8300
+    - 8301:8301
+    - 8302:8302
+    - 8400:8400
+    - 8500:8500
+couchbase:
+    image: couchbase/server
+    links:
+    - consul
+    ports:
+    - 8091:8091
+    - 8092:8092
+    - 11207:11207
+    - 11210:11210
+    - 11211:11211
+    - 18091:18091
+    - 18092:18092
