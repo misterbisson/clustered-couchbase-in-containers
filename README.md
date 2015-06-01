@@ -1,22 +1,29 @@
+# Couchbase cluster in Docker containers
+
+This is a Docker Compose file and shell script that will deploy a Couchbase cluster that can be scaled easily using `docker compose scale couchbase=$n`.
+
 ## Prep your environment
 
 1. [Get a Joyent account](https://my.joyent.com/landing/signup/), add your SSH key, and [get a beta invite](http://joyent.com/lp/preview).
 1. Install and configure the [Joyent CloudAPI CLI tools](https://apidocs.joyent.com/cloudapi/#getting-started).
-1. Install the Docker CLI.
-1. Configure your Docker CLI for use with Joyent:
+1. Install the Docker CLI and Docker Compose.
+1. [Configure your Docker CLI and Compose for use with Joyent](https://github.com/joyent/sdc-docker/tree/master/docs/api#the-helper-script):
 
 ```
 curl -O https://raw.githubusercontent.com/joyent/sdc-docker/master/tools/sdc-docker-setup.sh && chmod +x sdc-docker-setup.sh
  ./sdc-docker-setup.sh -k us-east-3b.api.joyent.com <ACCOUNT> ~/.ssh/<PRIVATE_KEY_FILE>
 ```
 
-## Kick things off
+## Easy instructions
 
-```bash
-bash start.sh
-```
+1. [Clone](git@github.com:misterbisson/clustered-couchbase-in-containers.git) or [download](https://github.com/misterbisson/clustered-couchbase-in-containers/archive/master.zip) this repo.
+1. `cd` into the cloned or downloaded directory.
+1. Execute `bash start.sh` to start everything up.
+    1. The script will use Docker compose to start the first containers, then execute a command to do the configuration of the first Couchbase node and start the cluster.
+1. Go to the Couchbase dashboard to see the working, one-node cluster.
+1. Scale the cluster using `docker-compose --project-name=ccic scale up couchbase=$n` and watch the node(s) join the cluster in the Couchbase dashboard.
 
----
+## Manual instructions
 
 The ambition is for this to work, though it is now blocked by DOCKER-409
 
