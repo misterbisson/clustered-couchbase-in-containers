@@ -1,64 +1,42 @@
 #!/bin/bash
 
-CBHOSTS=5
-NODERAM=800
+echo 'Starting Couchbase cluster'
 
+echo
+echo 'Pulling the most recent images'
 docker-compose pull
 
+echo
+echo 'Starting containers'
 docker-compose --project-name=ccic up -d --no-recreate
 
-echo 'Waiting 13 seconds for services to start'
-sleep 13
+echo
+echo -n 'Initilizing cluster.'
 
-echo 'Initilizing node'
-docker exec -it ccic_couchbase_1 \
-    couchbase-cli node-init -c 127.0.0.1:8091 -u access -p password \
-        --node-init-data-path=/opt/couchbase/var/lib/couchbase/data \
-        --node-init-index-path=/opt/couchbase/var/lib/couchbase/data \
-        --node-init-hostname=$(sdc-listmachines | json -aH -c "'ccic_couchbase_1' == this.name" ips.0)
+sleep 1.3
+COUCHBASERESPONSIVE=0
+while [ $COUCHBASERESPONSIVE != 1 ]; do
+    echo -n '.'
 
-echo 'Initilizing cluster'
-docker exec -it ccic_couchbase_1 \
-    couchbase-cli cluster-init -c 127.0.0.1:8091 -u access -p password \
-        --cluster-init-username=Administrator \
-        --cluster-init-password=password \
-        --cluster-init-port=8091 \
-        --cluster-init-ramsize=$NODERAM
-
-echo 'Initilizing bucket'
-docker exec -it ccic_couchbase_1 \
-    couchbase-cli bucket-create -c 127.0.01:8091 -u Administrator -p password \
-       --bucket=sync_gateway \
-       --bucket-type=couchbase \
-       --bucket-port=11222 \
-       --bucket-ramsize=$NODERAM \
-       --bucket-replica=1
+    RUNNING=$(docker inspect ccic_couchbase_1 | json -a State.Running)
+    if [ "$RUNNING" == "true" ]
+    then
+        docker exec -it ccic_couchbase_1 triton-bootstrap bootstrap benchmark
+        let COUCHBASERESPONSIVE=1
+    else
+        sleep 1.3
+    fi
+done
+echo
 
 CBDASHBOARD="$(sdc-listmachines | json -aH -c "'ccic_couchbase_1' == this.name" ips.1):8091"
-echo "Couchbase: $CBDASHBOARD"
+echo
+echo 'Couchbase cluster running and bootstrapped'
+echo "Dashboard: $CBDASHBOARD"
 echo "username=Administrator"
 echo "password=password"
 `open http://$CBDASHBOARD/index.html#sec=servers`
 
-echo "Growing cluster to $CBHOSTS hosts"
-docker-compose --project-name=ccic scale couchbase=$CBHOSTS
-
-echo 'Waiting 13 seconds for services to start'
-sleep 13
-
-for i in `seq 1 $CBHOSTS`; \
-    do \
-        echo 'Initilizing node'; \
-        docker exec -it ccic_couchbase_$i \
-            couchbase-cli node-init -c 127.0.0.1:8091 -u access -p password \
-                --node-init-data-path=/opt/couchbase/var/lib/couchbase/data \
-                --node-init-index-path=/opt/couchbase/var/lib/couchbase/data \
-                --node-init-hostname=$(sdc-listmachines | json -aH -c "'ccic_couchbase_$i' == this.name" ips.0); \
-
-        echo 'Joining cluster'; \
-        docker exec -it ccic_couchbase_1 \
-            couchbase-cli rebalance -c 127.0.0.1:8091 -u Administrator -p password \
-                --server-add=$(sdc-listmachines | json -aH -c "'ccic_couchbase_$i' == this.name" ips.0):8091 \
-                --server-add-username=Administrator \
-                --server-add-password=password; \
-done
+echo
+echo "Scale the cluster using the following command:"
+echo "docker-compose --project-name=ccic scale couchbase=$COUNT"

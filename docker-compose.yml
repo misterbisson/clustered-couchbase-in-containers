@@ -1,9 +1,10 @@
 #
-# Using a single consul host is _highly_ discourage, but yolo
+# Using a single Consul host is _highly_ discouraged, but yolo
 #
 consul:
     command: -server -bootstrap -ui-dir /ui
     image: progrium/consul:latest
+    mem_limit: 256m
     ports:
     - 53
     - 8300
@@ -13,15 +14,14 @@ consul:
     - 8500
 
 #
-# The first Couchbase container will bootstrap the cluster
-# Scale this tier and each additional container will automatically self-configure as a member of the cluster
-#
-# The link to consule is blocked by DOCKER-409
+# Manually bootstrap the first instance, then...
+# Scale this tier and each additional container/instance will automatically self-configure as a member of the cluster
 #
 couchbase:
-    image: couchbase/server
+    image: misterbisson/triton-couchbase
     links:
-    - consul:consul
+    - consul
+    mem_limit: 8192m
     ports:
     - 8091
     - 8092
@@ -32,5 +32,10 @@ couchbase:
     - 18092
 
 #
-# Benchmark container goes here...
+# Benchmark container
 #
+benchmark:
+    image: misterbisson/couchbase-cloud-benchmark
+    links:
+    - consul
+    mem_limit: 256m
