@@ -29,6 +29,11 @@ while [ $COUCHBASERESPONSIVE != 1 ]; do
 done
 echo
 
+echo
+echo 'Scaling Couchbase cluster to three nodes'
+echo 'docker-compose --project-name=ccic scale couchbase=3'
+docker-compose --project-name=ccic scale couchbase=3 --timeout=300
+
 CBDASHBOARD="$(sdc-listmachines | json -aH -c "'ccic_couchbase_1' == this.name" ips.1):8091"
 echo
 echo 'Couchbase cluster running and bootstrapped'
