@@ -56,7 +56,29 @@ docker-compose --timeout=120 --project-name=ccic scale couchbase=$COUNT
 
 Docker Compose will create new Couchbase containers according to the definition in the [docker-compose.yml](https://github.com/misterbisson/clustered-couchbase-in-containers/blob/master/docker-compose.yml), and when those containers come online they'll check with Consul to see if there's an established cluster. When they find there is, they'll join that cluster and rebalance the data across the new nodes.
 
-### Consul notes
+## Bootstrapping Couchbase
+
+The [Couchbase bootstrap script](https://github.com/misterbisson/triton-couchbase/blob/master/bin/triton-bootstrap) does the following:
+
+1. Set some environmental variables.
+1. Wait for the Couchbase daemon to be responsive.
+1. Check if Couchbase is already configured.
+    1. The boostrap will exit if so.
+1. Check if Consul is responsive.
+    1. The bootstrap will exit if Consul is unreachable.
+1. Initializes the Couchbase node
+1. Check for any arguments passed to the bootstrap script.
+    1. If the script is manually called with the `bootstrap` argument, it does the following:
+        1. Initializes the Couchbase cluster
+        1. Creates a data bucket
+    1. Otherwise, it will
+        1. Check Consul for an established Couchbase cluster
+        1. Join the cluster
+        1. Rebalance the cluster
+1. Check that the cluster is healthy
+1. Register the service with Consul.
+
+## Consul notes
 
 [Bootstrapping](https://www.consul.io/docs/guides/bootstrapping.html), [Consul clusters](https://www.consul.io/intro/getting-started/join.html), and the details about [adding and removing nodes](https://www.consul.io/docs/guides/servers.html). The [CLI](https://www.consul.io/docs/commands/index.html) and [HTTP](https://www.consul.io/docs/agent/http.html) API are also documented.
 
