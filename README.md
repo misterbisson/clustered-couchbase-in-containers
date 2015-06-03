@@ -60,23 +60,23 @@ Docker Compose will create new Couchbase containers according to the definition 
 
 The [Couchbase bootstrap script](https://github.com/misterbisson/triton-couchbase/blob/master/bin/triton-bootstrap) does the following:
 
-1. Set some environmental variables.
-1. Wait for the Couchbase daemon to be responsive.
-1. Check if Couchbase is already configured.
-    1. The boostrap will exit if so.
-1. Check if Consul is responsive.
-    1. The bootstrap will exit if Consul is unreachable.
+1. Set some environmental variables
+1. Wait for the Couchbase daemon to be responsive
+1. Check if Couchbase is already configured
+    1. The boostrap will exit if so
+1. Check if Consul is responsive
+    1. The bootstrap will exit if Consul is unreachable
 1. Initializes the Couchbase node
-1. Check for any arguments passed to the bootstrap script.
+1. Check for any arguments passed to the bootstrap script
     1. If the script is manually called with the `bootstrap` argument, it does the following:
         1. Initializes the Couchbase cluster
         1. Creates a data bucket
-    1. Otherwise, it will
+    1. Otherwise, it will...
         1. Check Consul for an established Couchbase cluster
         1. Join the cluster
         1. Rebalance the cluster
-1. Check that the cluster is healthy
-1. Register the service with Consul.
+1. Check that the cluster is healthy.
+1. Register the service with Consul
 
 ## Consul notes
 
