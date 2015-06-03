@@ -40,6 +40,7 @@ echo "password=password"
 echo
 echo 'Scaling Couchbase cluster to three nodes'
 echo 'docker-compose --project-name=ccic scale couchbase=3'
+docker-compose --project-name=ccic scale couchbase=2
 docker-compose --project-name=ccic scale couchbase=3
 
 echo
