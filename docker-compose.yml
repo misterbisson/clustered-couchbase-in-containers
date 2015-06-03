@@ -2,8 +2,8 @@
 # Using a single Consul host is _highly_ discouraged, but yolo
 #
 consul:
-    command: -server -bootstrap -ui-dir /ui
     image: progrium/consul:latest
+    command: -server -bootstrap -ui-dir /ui
     mem_limit: 256m
     ports:
     - 53
@@ -30,3 +30,13 @@ couchbase:
     - 11211
     - 18091
     - 18092
+
+#
+# Benchmarks, for fun and sparkles
+#
+benchmark:
+    image: misterbisson/couchbase-cloud-benchmark
+    command: start.bash
+    links:
+    - consul
+    mem_limit: 1024m

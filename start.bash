@@ -8,7 +8,7 @@ docker-compose pull
 
 echo
 echo 'Starting containers'
-docker-compose --project-name=ccic up -d --no-recreate --timeout=120
+docker-compose --project-name=ccic up -d --no-recreate --timeout=300
 
 echo
 echo -n 'Initilizing cluster.'
