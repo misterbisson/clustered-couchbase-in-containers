@@ -18,44 +18,43 @@ curl -O https://raw.githubusercontent.com/joyent/sdc-docker/master/tools/sdc-doc
 
 1. [Clone](git@github.com:misterbisson/clustered-couchbase-in-containers.git) or [download](https://github.com/misterbisson/clustered-couchbase-in-containers/archive/master.zip) this repo.
 1. `cd` into the cloned or downloaded directory.
-1. Execute `bash start.sh` to start everything up.
-    1. The script will use Docker compose to start the first containers, then execute a command to do the configuration of the first Couchbase node and start the cluster.
-1. Go to the Couchbase dashboard to see the working, one-node cluster.
+1. Execute `bash start.bash` to start everything up.
+1. The Couchbase dashboard should automatically open. Sign in with the user/pass printed in the output of `bash start.bash` to see the working, one-node cluster.
 1. Scale the cluster using `docker-compose --project-name=ccic scale up couchbase=$n` and watch the node(s) join the cluster in the Couchbase dashboard.
 
-## Manual instructions
+## Detailed instructions
 
-The ambition is for this to work, though it is now blocked by DOCKER-409
-
-## Start the music
+The [`start.bash` script](https://github.com/misterbisson/clustered-couchbase-in-containers/blob/master/start.bash) automatically does the following:
 
 ```bash
 docker-compose pull
-docker-compose --verbose --project-name=ccic up -d --no-recreate
+docker-compose --timeout=120 --project-name=ccic up -d --no-recreate
 ```
 
-## Make it louder
+Those Docker Compose commands read the [docker-compose.yml](https://github.com/misterbisson/clustered-couchbase-in-containers/blob/master/docker-compose.yml), which describes the three services in the app. The second command, we can call it `docker-compose up` for short, provisions a single container for each of the services.
+
+The three services include:
+
+- Couchbase, the database at the core of this application
+- Consul, to support service discovery and health checking among the different services
+- Couchbase Cloud Benchmarks, a benchmarking container to round out the picture
+
+Consul is running in it's default configuration as delivered in [Jeff Lindsay's excellent image](https://registry.hub.docker.com/u/progrium/consul/), but Couchbase is wrapped with a [custom start script that enables the magic here](https://github.com/misterbisson/triton-couchbase/blob/master/bin/triton-bootstrap).
+
+Once the first set of containers is running, the `start.bash` script bootstraps the Couchbase container with the following command:
 
 ```bash
-docker-compose --verbose --project-name=ccic scale couchbase=5
+docker exec -it ccic_couchbase_1 triton-bootstrap bootstrap benchmark
 ```
+Details of what that command does are described below, but the short story is that it initializes the cluster and creates a bucket, then registers this one node Couchbase service with the Consul container.
 
----
-
-### On each Couchbase container automatically
-
-Inside each Couchbase container
+Because one Couchbase container can get lonely, it's best to scale it using the following command:
 
 ```bash
-couchbase-cli node-init -c 127.0.0.1:8091 -u access -p password \
-    --node-init-data-path=/opt/couchbase/var/lib/couchbase/data \
-    --node-init-index-path=/opt/couchbase/var/lib/couchbase/data \
-    --node-init-hostname=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
+docker-compose --timeout=120 --project-name=ccic scale couchbase=$COUNT
 ```
 
-1. Check Consul to determine the IP address of one or more machines in the cluster
-    1. If no containers are registered yet, continue with cluster setup
-1. If one or more machines are registered, continue with joining the cluster
+Docker Compose will create new Couchbase containers according to the definition in the [docker-compose.yml](https://github.com/misterbisson/clustered-couchbase-in-containers/blob/master/docker-compose.yml), and when those containers come online they'll check with Consul to see if there's an established cluster. When they find there is, they'll join that cluster and rebalance the data across the new nodes.
 
 ### Consul notes
 
@@ -64,70 +63,12 @@ couchbase-cli node-init -c 127.0.0.1:8091 -u access -p password \
 [Check for registered instances of a named service](https://www.consul.io/docs/agent/http/catalog.html#catalog_service)
 
 ```bash
-curl -v http://165.225.190.200:8500/v1/catalog/service/couchbase | json -aH ServiceAddress
+curl -v http://consul:8500/v1/catalog/service/couchbase | json -aH ServiceAddress
 ```
 
 [Register an instance of a service](https://www.consul.io/docs/agent/http/catalog.html#catalog_register)
 
 ```bash
 export MYIP=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-curl http://165.225.190.200:8500/v1/agent/service/register -d "$(printf '{"ID": "couchbase-%s","Name": "couchbase","Address": "%s"}' $MYIP $MYIP)"
-```
-
-### Cluster setup
-
-Call the following to determine if the cluster is setup
-
-```bash
-curl -v http://165.225.190.200:8500/v1/catalog/service/couchbase | json -aH ServiceAddress
-```
-
-Inside one Couchbase container, if the cluster is not yet setup
-
-
-```bash
-couchbase-cli cluster-init -c 127.0.0.1:8091 -u access -p password \
-    --cluster-init-username=Administrator \
-    --cluster-init-password=password \
-    --cluster-init-port=8091 \
-    --cluster-init-ramsize=800
-```
-
-```bash
-couchbase-cli bucket-create -c 127.0.01:8091 -u Administrator -p password \
-   --bucket=sync_gateway \
-   --bucket-type=couchbase \
-   --bucket-port=11222 \
-   --bucket-ramsize=800 \
-   --bucket-replica=1
-```
-
-```bash
-export MYIP=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-curl http://165.225.190.200:8500/v1/agent/service/register -d "$(printf '{"ID": "couchbase-%s","Name": "couchbase","Address": "%s"}' $MYIP $MYIP)"
-```
-
-### Join the cluster
-
-Inside each Couchbase container after the first one, which presumably setup the cluster
-
-Call the [Couchbase HTTP API](http://docs.couchbase.com/admin/admin/REST/rest-cluster-addnodes.html) to add this node. `http://192.168.129.188` below is the IP address of the first Couchbase container.
-
-```bash
-curl -i -u Administrator:password \
-    http://192.168.129.188:8091/controller/addNode \
-    -d "hostname=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')&user=admin&password=password"
-```
-
-Then call the [CLI to rebalance](http://docs.couchbase.com/admin/admin/CLI/CBcli/cbcli-cluster-rebalance.html)
-
-```bash
-couchbase-cli rebalance -c 127.0.0.1:8091 -u Administrator -p password
-```
-
-Finally, [tell Consul](https://www.consul.io/docs/agent/http/catalog.html#catalog_register) about this newly added node
-
-```bash
-export MYIP=$(ip addr show eth0 | grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}')
-curl http://165.225.190.200:8500/v1/agent/service/register -d "$(printf '{"ID": "couchbase-%s","Name": "couchbase","Address": "%s"}' $MYIP $MYIP)"
+curl http://consul:8500/v1/agent/service/register -d "$(printf '{"ID": "couchbase-%s","Name": "couchbase","Address": "%s"}' $MYIP $MYIP)"
 ```

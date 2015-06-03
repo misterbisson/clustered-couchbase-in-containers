@@ -21,7 +21,7 @@ couchbase:
     image: misterbisson/triton-couchbase
     links:
     - consul
-    mem_limit: 8192m
+    mem_limit: 4096m
     ports:
     - 8091
     - 8092
@@ -30,3 +30,12 @@ couchbase:
     - 11211
     - 18091
     - 18092
+
+#
+# Benchmarks, for fun and sparkles
+#
+couchbase:
+    image: misterbisson/couchbase-cloud-benchmark
+    links:
+    - consul
+    mem_limit: 256m

@@ -8,7 +8,7 @@ docker-compose pull
 
 echo
 echo 'Starting containers'
-docker-compose --project-name=ccic up -d --no-recreate
+docker-compose --timeout=120 --project-name=ccic up -d --no-recreate
 
 echo
 echo -n 'Initilizing cluster.'
@@ -39,4 +39,4 @@ echo "password=password"
 
 echo
 echo "Scale the cluster using the following command:"
-echo "docker-compose --project-name=ccic scale couchbase=$COUNT"
+echo "docker-compose --timeout=120 --project-name=ccic scale couchbase=\$COUNT"
