@@ -12,6 +12,7 @@ consul:
     - 8302
     - 8400
     - 8500
+    restart: always
 
 #
 # Manually bootstrap the first instance, then...
@@ -30,6 +31,7 @@ couchbase:
     - 11211
     - 18091
     - 18092
+    restart: always
 
 #
 # Benchmarks, for fun and sparkles
@@ -40,3 +42,4 @@ benchmark:
     links:
     - consul
     mem_limit: 1024m
+    restart: always
