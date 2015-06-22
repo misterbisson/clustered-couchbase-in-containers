@@ -4,14 +4,14 @@ This is a Docker Compose file and shell script that will deploy a Couchbase clus
 
 ## Prep your environment
 
-1. [Get a Joyent account](https://my.joyent.com/landing/signup/), add your SSH key, and [get a beta invite](http://joyent.com/lp/preview).
+1. [Get a Joyent account](https://my.joyent.com/landing/signup/) and [add your SSH key](https://docs.joyent.com/public-cloud/getting-started).
 1. Install and configure the [Joyent CloudAPI CLI tools](https://apidocs.joyent.com/cloudapi/#getting-started).
-1. Install the Docker CLI and Docker Compose.
-1. [Configure your Docker CLI and Compose for use with Joyent](https://github.com/joyent/sdc-docker/tree/master/docs/api#the-helper-script):
+1. [Install Docker](https://docs.docker.com/installation/#installation) and [Docker Compose](https://docs.docker.com/compose/install/).
+1. [Configure your Docker CLI and Compose for use with Joyent](https://apidocs.joyent.com/docker):
 
 ```
 curl -O https://raw.githubusercontent.com/joyent/sdc-docker/master/tools/sdc-docker-setup.sh && chmod +x sdc-docker-setup.sh
- ./sdc-docker-setup.sh -k us-east-3b.api.joyent.com <ACCOUNT> ~/.ssh/<PRIVATE_KEY_FILE>
+ ./sdc-docker-setup.sh -k us-east-1.api.joyent.com <ACCOUNT> ~/.ssh/<PRIVATE_KEY_FILE>
 ```
 
 ## Easy instructions

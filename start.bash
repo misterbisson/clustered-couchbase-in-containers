@@ -37,7 +37,7 @@ echo 'Couchbase cluster running and bootstrapped'
 echo "Dashboard: $CBDASHBOARD"
 echo "username=Administrator"
 echo "password=password"
-`open http://$CBDASHBOARD/index.html#sec=servers`
+command -v open >/dev/null 2>&1 && `open http://$CBDASHBOARD/index.html#sec=servers`
 
 echo
 echo 'Scaling Couchbase cluster to three nodes'
@@ -47,4 +47,4 @@ docker-compose --project-name=$PREFIX scale couchbase=3
 
 echo
 echo "Go ahead, try a lucky 7 node cluster:"
-echo "docker-compose --project-name=$PREFIX scale couchbase=7"
+echo "docker-compose --project-name="$PREFIX" scale couchbase=7"
