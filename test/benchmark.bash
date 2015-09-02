@@ -11,14 +11,15 @@ HOSTSTRING=$(IFS="," ; echo "${HOSTS[*]}")
 
 echo Running benchmark vs $HOSTSTRING...
 
-docker run -m 1G 0x74696d/pillowfight cbc-pillowfight \
+docker run -d -m 8G 0x74696d/pillowfight cbc-pillowfight \
        --spec couchbase://$HOSTSTRING/benchmark \
-       --min-size=200 \
-       --max-size=200 \
-       --num-threads=10 \
-       --num-items=1000 \
-       --batch-size=500 \
+       --min-size=800 \
+       --max-size=800 \
+       --num-threads=64 \
+       --num-items=1000000 \
+       --batch-size=5000 \
        --num-cycles=10000 \
        --set-pct=10 \
-       --rate-limit=500000 \
-       --timings
+       --rate-limit=1000000 \
+       --timings \
+       --verbose

@@ -22,7 +22,7 @@ couchbase:
     image: misterbisson/triton-couchbase
     links:
     - consul
-    mem_limit: 4096m
+    mem_limit: 222g
     ports:
     - 8091
     - 8092
