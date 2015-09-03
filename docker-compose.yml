@@ -41,5 +41,6 @@ benchmark:
     mem_limit: 4g
     restart: always
     links:
+    - consul
     - couchbase
     command: benchmark.bash

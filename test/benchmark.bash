@@ -43,7 +43,7 @@ cbc-pillowfight \
     --num-threads=32 \
     --num-items=1000000 \
     --batch-size=5000 \
-    --num-cycles=-1 \
+    --num-cycles=10000 \
     --set-pct=10 \
     --rate-limit=1000000 \
     --timings \
