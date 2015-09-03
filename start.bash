@@ -49,3 +49,6 @@ docker-compose --project-name=$PREFIX scale couchbase=3
 echo
 echo "Go ahead, try a lucky 7 node cluster:"
 echo "docker-compose --project-name="$PREFIX" scale couchbase=7"
+echo
+echo "Or scale up test clients:"
+echo "docker-compose --project-name="$PREFIX" scale benchmark=7"
