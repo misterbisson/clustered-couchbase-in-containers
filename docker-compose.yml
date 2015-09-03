@@ -37,9 +37,9 @@ couchbase:
 # Benchmarks, for fun and sparkles
 #
 benchmark:
-    image: misterbisson/couchbase-cloud-benchmark
-    command: start.bash
-    links:
-    - consul
-    mem_limit: 1024m
+    image: 0x74696d/pillowfight
+    mem_limit: 4g
     restart: always
+    links:
+    - couchbase
+    command: benchmark.bash
