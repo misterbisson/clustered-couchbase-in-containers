@@ -38,9 +38,18 @@ couchbase:
 #
 benchmark:
     image: 0x74696d/pillowfight
-    mem_limit: 4g
-    restart: always
+    mem_limit: 8g
+    restart: never
     links:
     - consul
     - couchbase
+    environment:
+    - MIN_SIZE=800
+    - MAX_SIZE=800
+    - THREADS=32
+    - ITEMS=250000000
+    - BATCH=5000
+    - CYCLES=10000
+    - SET_PCT=10
+    - RATE_LIMIT=1000000
     command: benchmark.bash
