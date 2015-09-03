@@ -34,17 +34,25 @@ while [ $CLUSTERFOUND != 1 ]; do
 done
 sleep 3
 
+MIN_SIZE=${MIN_SIZE:-800}
+MAX_SIZE=${MAX_SIZE:-800}
+THREADS=${THREADS:-32}
+ITEMS=${ITEMS:-2500000}
+BATCH=${BATCH:-5000}
+CYCLES=${CYCLES:-10000}
+SET_PCT=${SET_PCT:-10}
+RATE_LIMIT=${RATE_LIMIT:1000000}
 
 echo Running benchmark vs $HOSTSTRING...
 cbc-pillowfight \
     --spec couchbase://$HOSTSTRING/benchmark \
-    --min-size=800 \
-    --max-size=800 \
-    --num-threads=32 \
-    --num-items=1000000 \
-    --batch-size=5000 \
-    --num-cycles=10000 \
-    --set-pct=10 \
-    --rate-limit=1000000 \
+    --min-size=${MIN_SIZE} \
+    --max-size=${MAX_SIZE} \
+    --num-threads=${THREADS} \
+    --num-items=${ITEMS} \
+    --batch-size=${BATCH} \
+    --num-cycles=${CYCLES} \
+    --set-pct=${SET_PCT} \
+    --rate-limit=${RATE_LIMIT} \
     --timings \
     --verbose
