@@ -11,10 +11,12 @@ docker-compose pull
 
 echo
 echo 'Starting containers'
-docker-compose --project-name=$PREFIX up -d --no-recreate --timeout=300
+# starts the couchbase containers and their deps but not the benchmark
+# client container
+docker-compose --project-name=$PREFIX up -d --no-recreate --timeout=300 couchbase
 
 echo
-echo -n 'Initilizing cluster.'
+echo -n 'Initializing cluster.'
 
 sleep 1.3
 COUCHBASERESPONSIVE=0
@@ -50,5 +52,6 @@ echo
 echo "Go ahead, try a lucky 7 node cluster:"
 echo "docker-compose --project-name="$PREFIX" scale couchbase=7"
 echo
-echo "Or scale up test clients:"
+echo "Or start and scale up benchmark clients:"
+echo "docker-compose --project-name="$PREFIX" up benchmark"
 echo "docker-compose --project-name="$PREFIX" scale benchmark=7"
