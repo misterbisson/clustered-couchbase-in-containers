@@ -3,7 +3,7 @@
 
 HOSTS=()
 CONTAINERS=()
-for container in $(docker ps | awk -F' +' '/ccic_couchbase/{print $NF}')
+for container in $(docker ps | awk -F' +' '/ ccic_couchbase_[0-9+]/{print $NF}')
 do
     CONTAINERS=($container)
     HOSTS+=($(docker inspect $container | json -a NetworkSettings.IPAddress))
