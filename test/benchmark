@@ -1,0 +1,131 @@
+#!/bin/bash
+
+usage() {
+    cat <<EOF
+usage: $0 [COMMAND] <OPTIONS> -- <ARGS>
+
+Runs couchbase benchmarks, for fun and sparkles.
+
+COMMANDS:
+  load: run cbc-pillowfight in the couchbase test client container to load in
+        data for testing. <args> will be passed thru to cbc-pillowfight
+        automatically. The --spec argument will be added automatically to args
+        and you should not include it.
+        default <args> are: --json --template id,0,200 -m 1 -M 1
+
+  test: run cbc-n1qlback in the couchbase test client container to run our tests.
+        <args> will be passed thru to cbc-n1qlback automatically. The --spec
+        argument will be added automatically and you should not include it.
+
+  stop: stop and rm all clients
+  update: pulls an updated test client container image
+  help: show this message
+
+OPTIONS:
+ -p name of prefix to be hit (ex. "ccic")
+ -n number of nodes to run (defaults to 2)
+ -v version of Couchbase (only 3 or 4 are valid values, defaults to 4)
+ -t type of client for command (only "load" or "test" are valid values), for use
+    only with "scale" or "update" commands.
+ -b bucket to hit (defaults to "benchmark")
+
+EXAMPLES:
+
+ Use cbc-pillowfight to run on 3 nodes against a v4 cluster named ccic4, loading
+ 1 million items:
+ ./benchmark load -n3 -v4 -p ccic4 -- -i 1000000
+
+ Use cbc-n1qlback to run on 4 nodes against a v4 cluster, running a query file
+ ./benchmark test -n4 -v4 -- -f ./path/to/query/file.json
+
+EOF
+}
+
+# default global parameters
+VERSION=4
+NUM=2
+PREFIX=ccic
+BUCKET=benchmark
+ARGS=
+TYPE=
+EXEC=
+
+get_cb_hosts() {
+    local HOSTS=()
+    for container in $(docker ps | awk -F' +' '/ '${PREFIX}'_couchbase'${VERSION}'_[0-9+]/{print $NF}')
+    do
+        HOSTS+=($(docker inspect $container | json -a NetworkSettings.IPAddress))
+    done
+    HOSTSTRING=$(IFS="," ; echo "${HOSTS[*]}")
+    echo "Found couchbase servers at $(IFS=" " ; echo "${HOSTS[*]}")..."
+}
+
+load() {
+    EXEC=cbc-pillowfight
+    TYPE=load
+    ARGS="$@"
+    # populate default pillowfight arguments
+    if [ -z "$ARGS" ]; then
+        ARGS='--json --template id,0,200 -m 1 -M 1'
+    fi
+    _run
+}
+
+test() {
+    EXEC=cbc-n1qlback
+    TYPE=test
+    ARGS="$@"
+    # TODO: populate default n1qlback arguments
+    if [ -z "$ARGS" ]; then
+        ARGS='--json --template id,0,200 -m 1 -M 1'
+    fi
+    _run
+}
+
+_run() {
+    get_cb_hosts
+    for i in $(seq $NUM)
+    do
+        docker run -d \
+               --name ${PREFIX}_client_${TYPE}_$i \
+               0x74696d/pillowfight \
+               ${EXEC} \
+               --spec couchbase://${HOSTSTRING}/${BUCKET} \
+               ${ARGS}
+    done
+}
+
+stop() {
+    if [ -z "$TYPE" ]; then
+        echo "No client type specified, stopping and removing all..."
+    fi
+    for container in $(docker ps | awk -F' +' '/ '${PREFIX}'_client_'${TYPE}'/{print $NF}')
+    do
+        docker stop $container
+        docker rm $container
+    done
+}
+
+update() {
+    docker pull 0x74696d/pillowfight
+}
+
+help() {
+    usage
+}
+
+cmd="${1:-run}"
+shift
+
+while getopts "v:n:p:b:t:" optchar; do
+    case "${optchar}" in
+        v) VERSION=${OPTARG} ;;
+        n) NUM=${OPTARG} ;;
+        p) PREFIX=${OPTARG} ;;
+        b) BUCKET=${OPTARG} ;;
+        t) TYPE=${TYPE} ;;
+    esac
+done
+shift $(expr $OPTIND - 1 )
+
+$cmd "$@"
