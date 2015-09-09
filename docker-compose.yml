@@ -18,8 +18,23 @@ consul:
 # Manually bootstrap the first instance, then...
 # Scale this tier and each additional container/instance will automatically self-configure as a member of the cluster
 #
-couchbase:
+couchbase3:
     image: misterbisson/triton-couchbase
+    links:
+    - consul
+    mem_limit: 222g
+    ports:
+    - 8091
+    - 8092
+    - 11207
+    - 11210
+    - 11211
+    - 18091
+    - 18092
+    restart: always
+
+couchbase4:
+    image: 0x74696d/triton-couchbase:4.0.0
     links:
     - consul
     mem_limit: 222g

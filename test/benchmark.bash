@@ -1,9 +1,13 @@
 #!/bin/bash
 # Benchmarks, for fun and sparkles
 
+VERSION=${1:-4}
+PREFIX=ccic${VERSION}
+NUM=${2:-2}
+
 HOSTS=()
 CONTAINERS=()
-for container in $(docker ps | awk -F' +' '/ ccic_couchbase_[0-9+]/{print $NF}')
+for container in $(docker ps | awk -F' +' '/ '${PREFIX}'_couchbase'${VERSION}'_[0-9+]/{print $NF}')
 do
     CONTAINERS=($container)
     HOSTS+=($(docker inspect $container | json -a NetworkSettings.IPAddress))
@@ -12,10 +16,10 @@ HOSTSTRING=$(IFS="," ; echo "${HOSTS[*]}")
 
 echo Running benchmark vs $HOSTSTRING...
 
-for i in $(seq 2)
+for i in $(seq $NUM)
 do
     docker run -d \
-           --name ccic_client_$i \
+           --name ${PREFIX}_client_$i \
            0x74696d/pillowfight \
            cbc-pillowfight \
            --spec couchbase://${HOSTSTRING}/benchmark \
