@@ -20,6 +20,7 @@ build: .build-builder
 	mkdir -p build
 	docker cp $(shell docker create cbc-pillowfight-builder):/libcouchbase/build/lib/libcouchbase.so.2.0.28 - > build/libcouchbase.so.2.0.28
 	docker cp $(shell docker create cbc-pillowfight-builder):/libcouchbase/build/bin/cbc-pillowfight - > build/cbc-pillowfight
+	docker cp $(shell docker create cbc-pillowfight-builder):/libcouchbase/build/bin/cbc-n1qlback - > build/cbc-n1qlback
 	docker build --no-cache -t="cbc-pillowfight" -f=Dockerfile .
 
 # push our image to the public registry
