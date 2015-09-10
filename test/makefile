@@ -6,7 +6,6 @@ SHELL := /bin/bash
 ROOT := $(shell pwd)
 
 clean:
-	# rm -f .build-builder
 	rm -rf build
 
 # builds the build container, which contains everything we need
@@ -24,7 +23,7 @@ build: .build-builder
 		-e CGO_ENABLED=0 \
 		-e GOPATH=/cbc-benchmark/.godeps:/cbc-benchmark \
 		-v ${ROOT}:/cbc-benchmark -w /cbc-benchmark \
-		golang-alpine go build -a -o /cbc-benchmark/build/cbc-benchmark main \
+		golang-alpine go build -a -o /cbc-benchmark/build/cbc-benchmark \
 		&& docker wait cbc-build
 	@docker kill cbc-build || true \
 		&& docker rm cbc-build || true
