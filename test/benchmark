@@ -7,15 +7,11 @@ usage: $0 [COMMAND] <OPTIONS> -- <ARGS>
 Runs couchbase benchmarks, for fun and sparkles.
 
 COMMANDS:
-  load: run cbc-pillowfight in the couchbase test client container to load in
-        data for testing. <args> will be passed thru to cbc-pillowfight
-        automatically. The --spec argument will be added automatically to args
-        and you should not include it.
-        default <args> are: --json --template id,0,200 -m 1 -M 1
+  load: run cbc-benchmark to load data in for testing. any <args> passed in
+        will be passed through to the cbc-benchmark executable.
 
-  test: run cbc-n1qlback in the couchbase test client container to run our tests.
-        <args> will be passed thru to cbc-n1qlback automatically. The --spec
-        argument will be added automatically and you should not include it.
+  test: run cbc-benchmark to query views. any <args> passed in will be passed
+        through to the cbc-benchmark executable.
 
   stop: stop and rm all clients
   update: pulls an updated test client container image
@@ -25,18 +21,14 @@ OPTIONS:
  -p name of prefix to be hit (ex. "ccic")
  -n number of nodes to run (defaults to 2)
  -v version of Couchbase (only 3 or 4 are valid values, defaults to 4)
- -t type of client for command (only "load" or "test" are valid values), for use
-    only with "scale" or "update" commands.
- -b bucket to hit (defaults to "benchmark")
 
 EXAMPLES:
 
- Use cbc-pillowfight to run on 3 nodes against a v4 cluster named ccic4, loading
- 1 million items:
- ./benchmark load -n3 -v4 -p ccic4 -- -i 1000000
+ Load 1 million items into a v4 cluster named ccic4:
+ ./benchmark load -v4 -p ccic4 -- -i 1000000
 
- Use cbc-n1qlback to run on 4 nodes against a v4 cluster, running a query file
- ./benchmark test -n4 -v4 -- -f ./path/to/query/file.json
+ Run a query test against a v4 cluster, using 4 nodes.
+ ./benchmark test -n4 -v4
 
 EOF
 }
@@ -47,67 +39,48 @@ NUM=2
 PREFIX=ccic
 BUCKET=benchmark
 ARGS=
-TYPE=
-EXEC=
+LINKS=
 
-get_cb_hosts() {
-    local HOSTS=()
+get_links() {
+    local consul=
+    consul=$(docker ps | awk -F' +' '/ '${PREFIX}'_consul/{print $NF}')
+    LINKS="--link $consul:consul "
     for container in $(docker ps | awk -F' +' '/ '${PREFIX}'_couchbase'${VERSION}'_[0-9+]/{print $NF}')
     do
-        HOSTS+=($(docker inspect $container | json -a NetworkSettings.IPAddress))
+        LINKS="$LINKS --link $container:$container "
     done
-    HOSTSTRING=$(IFS="," ; echo "${HOSTS[*]}")
-    echo "Found couchbase servers at $(IFS=" " ; echo "${HOSTS[*]}")..."
 }
 
+# load and test just wrap run with the appropriate command flag
 load() {
-    EXEC=cbc-pillowfight
-    TYPE=load
-    ARGS="$@"
-    # populate default pillowfight arguments
-    if [ -z "$ARGS" ]; then
-        ARGS='--json --template id,0,200 -m 1 -M 1'
-    fi
-    _run
+    run
 }
-
 test() {
-    EXEC=cbc-n1qlback
-    TYPE=test
-    ARGS="$@"
-    # TODO: populate default n1qlback arguments
-    if [ -z "$ARGS" ]; then
-        ARGS='--json --template id,0,200 -m 1 -M 1'
-    fi
-    _run
+    run
 }
-
-_run() {
-    get_cb_hosts
+run() {
+    get_links
     for i in $(seq $NUM)
     do
         docker run -d \
-               --name ${PREFIX}_client_${TYPE}_$i \
-               0x74696d/pillowfight \
-               ${EXEC} \
-               --spec couchbase://${HOSTSTRING}/${BUCKET} \
-               ${ARGS}
+               --name ${PREFIX}_benchmark_$i \
+               $LINKS \
+               0x74696d/cbc-benchmark \
+               -$cmd -b ${BUCKET} ${@}
     done
 }
 
 stop() {
-    if [ -z "$TYPE" ]; then
-        echo "No client type specified, stopping and removing all..."
-    fi
-    for container in $(docker ps | awk -F' +' '/ '${PREFIX}'_client_'${TYPE}'/{print $NF}')
+    for container in $(docker ps -a | awk -F' +' '/ '${PREFIX}'_benchmark_/{print $NF}')
     do
-        docker stop $container
+        docker stop $container || true
         docker rm $container
     done
+
 }
 
 update() {
-    docker pull 0x74696d/pillowfight
+    docker pull 0x74696d/cbc-benchmark
 }
 
 help() {
@@ -123,7 +96,6 @@ while getopts "v:n:p:b:t:" optchar; do
         n) NUM=${OPTARG} ;;
         p) PREFIX=${OPTARG} ;;
         b) BUCKET=${OPTARG} ;;
-        t) TYPE=${TYPE} ;;
     esac
 done
 shift $(expr $OPTIND - 1 )
