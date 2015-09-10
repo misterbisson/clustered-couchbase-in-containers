@@ -52,12 +52,8 @@ get_links() {
 }
 
 # load and test just wrap run with the appropriate command flag
-load() {
-    run
-}
-test() {
-    run
-}
+load() { run ${@}; }
+test() { run ${@}; }
 run() {
     get_links
     for i in $(seq $NUM)
