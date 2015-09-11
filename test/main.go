@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/couchbaselabs/gocb"
@@ -19,6 +20,14 @@ import (
 var (
 	maxDocs     int32
 	concurrency int
+	bucketName  string
+)
+
+// for connecting to Couchbase REST API
+// TODO: make these come from command line args
+const (
+	cbCredsUsername = "Administrator"
+	cbCredsPassword = "password"
 )
 
 func main() {
@@ -30,31 +39,33 @@ func main() {
 	concurrencyVar := flag.Int("c", 10, "Maximum number of goroutines to run. [default 10]")
 	bucketVar := flag.String("b", "benchmark", "Name of bucket. [default benchmark]")
 	doViewTest := flag.Bool("view", false, "Load test via making view queries")
-	// doN1QLTest := flag.Bool("n1ql", false, "Load test via making n1ql queries")
+	doN1QLTest := flag.Bool("n1ql", false, "Load test via making n1ql queries")
 
 	// parse arguments and assign to configuration
 	flag.Parse()
 	maxDocs = int32(*maxDocsVar)
 	concurrency = *concurrencyVar
+	bucketName = *bucketVar
 
 	log.Println("Connecting to cluster...")
 	cluster := getCluster()
-	bucket := getBucket(cluster, *bucketVar)
+	bucket := getBucket(cluster, bucketName)
 
 	if *doLoad {
 		log.Printf("Loading %v items w/ %v goroutines", maxDocs, concurrency)
 		preLoadData(bucket)
 		os.Exit(0)
 	}
-
 	if *doViewTest {
 		log.Printf("Running view queries test w/ %v goroutines...", concurrency)
 		viewTest(bucket)
 		os.Exit(0)
 	}
-	// if *doN1QLTest {
-	// 	n1qlTest(bucket)
-	// }
+	if *doN1QLTest {
+		log.Printf("Running n1ql queries test w/ %v goroutines...", concurrency)
+		n1qlTest(bucket)
+		os.Exit(0)
+	}
 }
 
 // ---------------------------------------------------
@@ -180,27 +191,15 @@ func viewTest(bucket *gocb.Bucket) {
 
 // Hit the REST API to create a view that maps email to [id, name].
 func createViewQuery(bucket *gocb.Bucket) error {
-	url := fmt.Sprintf("http://%s:8092/benchmark/_design/viewByEmail", getClusterIP())
-	var body = []byte(`{
+	url := fmt.Sprintf("http://%s:8092/%s/_design/viewByEmail", getClusterIP(), bucketName)
+	var body = `{
   "views": {
     "byEmail": {
       "map": "function (doc, meta) {emit(doc.email, [meta.id, doc.name]);}"
     }
   }
-}`)
-	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(body))
-	req.SetBasicAuth("Administrator", "password")
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	if resp, err := client.Do(req); err != nil {
-		return err
-	} else {
-		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("HTTP%v, %v", resp.Status, string(body))
-	}
-	return nil
+}`
+	return restApiCall("PUT", url, body, "application/json")
 }
 
 // Get the document associated with the emailAddress by hitting
@@ -218,11 +217,76 @@ func getViewQuery(bucket *gocb.Bucket, emailAddress string) error {
 }
 
 // ---------------------------------------------------
+// testing n1ql queries
+
+func n1qlTest(bucket *gocb.Bucket) {
+
+	if err := prepareN1QLIndex(bucket); err == nil {
+		var wg sync.WaitGroup
+		wg.Add(concurrency)
+		for i := 0; i < concurrency; i++ {
+			go func(*gocb.Bucket) {
+				for {
+					emailAddress := getRandomEmailAddress()
+					getN1QLQuery(bucket, emailAddress)
+				}
+			}(bucket)
+		}
+		wg.Wait()
+	} else {
+		log.Fatal(err)
+	}
+}
+
+// Hit the REST API to prepare a N1QL index
+func prepareN1QLIndex(bucket *gocb.Bucket) error {
+	url := fmt.Sprintf("http://%s:8093/query/service", getClusterIP())
+	var body = fmt.Sprintf("statement=create primary index on %v", bucketName)
+	return restApiCall("POST", url, body, "application/x-www-form-urlencoded")
+}
+
+// Get the document associated with the emailAddress by making a N1QL query
+func getN1QLQuery(bucket *gocb.Bucket, emailAddress string) error {
+
+	byEmailQuery := gocb.NewN1qlQuery(
+		fmt.Sprintf("select 'id','name' from %v where email='%v'",
+			bucketName, emailAddress),
+	)
+	var row interface{}
+
+	defer stopTimer(startTimer(fmt.Sprintf("n1qlquery:%v", emailAddress)))
+	rows := bucket.ExecuteN1qlQuery(byEmailQuery, nil)
+	rows.One(&row)
+	return rows.Close()
+}
+
+// ---------------------------------------------------
 // utilities
 
 // defer this function and pass the startTimer function in as its
 // arguments and it will wrap the scope with a timer that writes
 // out to log
+
+// make a REST API call to Couchbase
+func restApiCall(method, url, body, contentType string) error {
+	req, _ := http.NewRequest(method, url, bytes.NewBuffer([]byte(body)))
+	req.SetBasicAuth(cbCredsUsername, cbCredsPassword)
+	req.Header.Set("Content-Type", contentType)
+
+	client := &http.Client{}
+	if resp, err := client.Do(req); err != nil {
+		return err
+	} else {
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+		log.Printf("HTTP%v, %v", resp.Status, string(body))
+		if resp.StatusCode == http.StatusNotFound {
+			return errors.New(string(body))
+		}
+	}
+	return nil
+}
+
 func stopTimer(s string, startTime time.Time) {
 	endTime := time.Now()
 	log.Printf("time,%v,%v", s, endTime.Sub(startTime))
