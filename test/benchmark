@@ -13,7 +13,7 @@ COMMANDS:
   view: run cbc-benchmark to test views. any <args> passed in will be passed
         through to the cbc-benchmark executable.
 
-  query: run cbc-benchmark to test n1ql queries. any <args> passed in will be passed
+  n1ql: run cbc-benchmark to test n1ql queries. any <args> passed in will be passed
         through to the cbc-benchmark executable.
 
   stop: stop and rm all clients
@@ -30,8 +30,8 @@ EXAMPLES:
  Load 1 million items into a v4 cluster named ccic4:
  ./benchmark load -v4 -p ccic4 -- -i 1000000
 
- Run a query test against a v4 cluster, using 4 nodes.
- ./benchmark test -n4 -v4
+ Run a view test against a v4 cluster, using 4 nodes and 10 goroutines.
+ ./benchmark view -n4 -v4 -- -i 1000000 -c 10
 
 EOF
 }

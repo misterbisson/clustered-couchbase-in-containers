@@ -30,7 +30,7 @@ func main() {
 	concurrencyVar := flag.Int("c", 10, "Maximum number of goroutines to run. [default 10]")
 	bucketVar := flag.String("b", "benchmark", "Name of bucket. [default benchmark]")
 	doViewTest := flag.Bool("view", false, "Load test via making view queries")
-	// doQueryTest := flag.Bool("query", false, "Load test via making n1ql queries")
+	// doN1QLTest := flag.Bool("n1ql", false, "Load test via making n1ql queries")
 
 	// parse arguments and assign to configuration
 	flag.Parse()
@@ -52,8 +52,8 @@ func main() {
 		viewTest(bucket)
 		os.Exit(0)
 	}
-	// if *doQueryTest {
-	// 	queryTest(bucket)
+	// if *doN1QLTest {
+	// 	n1qlTest(bucket)
 	// }
 }
 
