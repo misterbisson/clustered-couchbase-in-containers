@@ -10,7 +10,10 @@ COMMANDS:
   load: run cbc-benchmark to load data in for testing. any <args> passed in
         will be passed through to the cbc-benchmark executable.
 
-  test: run cbc-benchmark to query views. any <args> passed in will be passed
+  view: run cbc-benchmark to test views. any <args> passed in will be passed
+        through to the cbc-benchmark executable.
+
+  query: run cbc-benchmark to test n1ql queries. any <args> passed in will be passed
         through to the cbc-benchmark executable.
 
   stop: stop and rm all clients
@@ -53,7 +56,7 @@ get_links() {
 
 # load and test just wrap run with the appropriate command flag
 load() { run ${@}; }
-test() { run ${@}; }
+view() { run ${@}; }
 run() {
     get_links
     for i in $(seq $NUM)
