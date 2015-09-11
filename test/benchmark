@@ -57,6 +57,8 @@ get_links() {
 # load and test just wrap run with the appropriate command flag
 load() { run ${@}; }
 view() { run ${@}; }
+n1ql() { run ${@}; }
+
 run() {
     get_links
     for i in $(seq $NUM)
