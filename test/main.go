@@ -2,10 +2,10 @@ package main
 
 import (
 	"bytes"
-	"errors"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/couchbaselabs/gocb"
+	"github.com/couchbase/gocb"
 	consul "github.com/hashicorp/consul/api"
 	"io/ioutil"
 	"log"
@@ -21,6 +21,7 @@ var (
 	maxDocs     int32
 	concurrency int
 	bucketName  string
+	debug       bool
 )
 
 // for connecting to Couchbase REST API
@@ -35,17 +36,19 @@ func main() {
 	rand.Seed(time.Now().Unix())
 
 	doLoad := flag.Bool("load", false, "Load data into couchbase.")
-	maxDocsVar := flag.Int("i", 1000, "Number of documents for load script. [default 1000]")
-	concurrencyVar := flag.Int("c", 10, "Maximum number of goroutines to run. [default 10]")
-	bucketVar := flag.String("b", "benchmark", "Name of bucket. [default benchmark]")
+	maxDocsFlag := flag.Int("i", 1000, "Number of documents for load script. [default 1000]")
+	concurrencyFlag := flag.Int("c", 10, "Maximum number of goroutines to run. [default 10]")
+	bucketFlag := flag.String("b", "benchmark", "Name of bucket. [default benchmark]")
 	doViewTest := flag.Bool("view", false, "Load test via making view queries")
 	doN1QLTest := flag.Bool("n1ql", false, "Load test via making n1ql queries")
+	debugFlag := flag.Bool("debug", false, "Write debug-level logs")
 
 	// parse arguments and assign to configuration
 	flag.Parse()
-	maxDocs = int32(*maxDocsVar)
-	concurrency = *concurrencyVar
-	bucketName = *bucketVar
+	maxDocs = int32(*maxDocsFlag)
+	concurrency = *concurrencyFlag
+	bucketName = *bucketFlag
+	debug = *debugFlag
 
 	log.Println("Connecting to cluster...")
 	cluster := getCluster()
@@ -199,7 +202,10 @@ func createViewQuery(bucket *gocb.Bucket) error {
     }
   }
 }`
-	return restApiCall("PUT", url, body, "application/json")
+
+	resp, err := restApiCall("PUT", url, body, "application/json")
+	debugPrintf("%v", resp)
+	return err
 }
 
 // Get the document associated with the emailAddress by hitting
@@ -211,9 +217,13 @@ func getViewQuery(bucket *gocb.Bucket, emailAddress string) error {
 	var row interface{}
 
 	defer stopTimer(startTimer(fmt.Sprintf("viewQuery:%v", emailAddress)))
-	rows := bucket.ExecuteViewQuery(byEmailQuery)
-	rows.One(&row)
-	return rows.Close()
+	if rows, err := bucket.ExecuteViewQuery(byEmailQuery); err != nil {
+		return err
+	} else {
+		rows.One(&row)
+		debugPrintf("%v", row)
+		return rows.Close()
+	}
 }
 
 // ---------------------------------------------------
@@ -228,7 +238,10 @@ func n1qlTest(bucket *gocb.Bucket) {
 			go func(*gocb.Bucket) {
 				for {
 					emailAddress := getRandomEmailAddress()
-					getN1QLQuery(bucket, emailAddress)
+					if err := getN1QLQuery(bucket, emailAddress); err != nil {
+						debugPrintf("%v", err)
+						os.Exit(-1)
+					}
 				}
 			}(bucket)
 		}
@@ -242,22 +255,42 @@ func n1qlTest(bucket *gocb.Bucket) {
 func prepareN1QLIndex(bucket *gocb.Bucket) error {
 	url := fmt.Sprintf("http://%s:8093/query/service", getClusterIP())
 	var body = fmt.Sprintf("statement=create primary index on %v", bucketName)
-	return restApiCall("POST", url, body, "application/x-www-form-urlencoded")
+
+	if resp, err := restApiFormPost(url, body); err == nil {
+		debugPrintf("%v", resp)
+		body = fmt.Sprintf("statement=prepare select * from %v where email=$1", bucketName)
+		resp, err = restApiFormPost(url, body)
+		debugPrintf("%v", resp)
+		return err
+	} else {
+		return err
+	}
+}
+
+type N1QLResult struct {
+	Results []json.RawMessage `json:"results"`
 }
 
 // Get the document associated with the emailAddress by making a N1QL query
 func getN1QLQuery(bucket *gocb.Bucket, emailAddress string) error {
-
-	byEmailQuery := gocb.NewN1qlQuery(
-		fmt.Sprintf("select 'id','name' from %v where email='%v'",
-			bucketName, emailAddress),
-	)
-	var row interface{}
-
+	url := fmt.Sprintf("http://%s:8093/query/service", getClusterIP())
+	var body = fmt.Sprintf("statement=select * from %v where email='%v'", bucketName, emailAddress)
 	defer stopTimer(startTimer(fmt.Sprintf("n1qlquery:%v", emailAddress)))
-	rows := bucket.ExecuteN1qlQuery(byEmailQuery, nil)
-	rows.One(&row)
-	return rows.Close()
+	if resp, err := restApiFormPost(url, body); err != nil {
+		return err
+	} else {
+		if debug {
+			var result N1QLResult
+			if err := json.Unmarshal([]byte(resp), &result); err != nil {
+				log.Printf(resp)
+				return err
+			}
+			if len(result.Results) > 0 {
+				log.Printf("%v", string(result.Results[0]))
+			}
+		}
+	}
+	return nil
 }
 
 // ---------------------------------------------------
@@ -267,24 +300,24 @@ func getN1QLQuery(bucket *gocb.Bucket, emailAddress string) error {
 // arguments and it will wrap the scope with a timer that writes
 // out to log
 
-// make a REST API call to Couchbase
-func restApiCall(method, url, body, contentType string) error {
+func restApiFormPost(url, body string) (string, error) {
+	return restApiCall("POST", url, body, "application/x-www-form-urlencoded")
+}
+
+// wrap the REST API calls to Couchbase
+func restApiCall(method, url, body, contentType string) (string, error) {
 	req, _ := http.NewRequest(method, url, bytes.NewBuffer([]byte(body)))
 	req.SetBasicAuth(cbCredsUsername, cbCredsPassword)
 	req.Header.Set("Content-Type", contentType)
 
 	client := &http.Client{}
 	if resp, err := client.Do(req); err != nil {
-		return err
+		return "", err
 	} else {
 		defer resp.Body.Close()
 		body, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("HTTP%v, %v", resp.Status, string(body))
-		if resp.StatusCode == http.StatusNotFound {
-			return errors.New(string(body))
-		}
+		return string(body), nil
 	}
-	return nil
 }
 
 func stopTimer(s string, startTime time.Time) {
@@ -324,26 +357,8 @@ func getRandomEmailAddress() string {
 	return fmt.Sprintf("%020d@joyent.com", docId)
 }
 
-// ---------------------------------------------------
-// debugging/testing
-
-func checkDoc(bucket *gocb.Bucket, docId int32) error {
-	var key = fmt.Sprintf("%v", docId)
-	var doc map[string]interface{}
-	if cas, err := bucket.Get(key, &doc); err != nil {
-		return err
-	} else {
-		log.Printf("got %v\n", doc["email"])
-		doc["email"] = "newemail@joyent.com"
-		if _, replaceErr := bucket.Replace(key, &doc, cas, 0); replaceErr != nil {
-			return replaceErr
-		} else {
-			if _, secondGetErr := bucket.Get(key, &doc); secondGetErr == nil {
-				log.Printf("got %v\n", doc["email"])
-			} else {
-				return secondGetErr
-			}
-		}
+func debugPrintf(fmtString string, vals ...interface{}) {
+	if debug {
+		log.Printf(fmtString, vals...)
 	}
-	return nil
 }
