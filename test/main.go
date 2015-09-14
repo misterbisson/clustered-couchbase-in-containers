@@ -11,63 +11,51 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 )
 
 // these are populated by the flag variables
 var (
-	maxDocs     int32
-	concurrency int
-	bucketName  string
-	debug       bool
-)
-
-// for connecting to Couchbase REST API
-// TODO: make these come from command line args
-const (
-	cbCredsUsername = "Administrator"
-	cbCredsPassword = "password"
+	maxDocs         int // maximum document ID
+	concurrency     int // number of goroutines to execute
+	bucketName      string
+	debug           bool   // flag to log debug statements
+	cbCredsUsername string // for connecting to the Couchbase REST API
+	cbCredsPassword string // for connecting to the Couchbase REST API
 )
 
 func main() {
 
 	rand.Seed(time.Now().Unix())
 
+	flag.IntVar(&maxDocs, "i", 1000, "Number of documents for load script. [default 1000]")
+	flag.IntVar(&concurrency, "c", 10, "Maximum number of goroutines to run. [default 10]")
+	flag.StringVar(&bucketName, "b", "benchmark", "Name of bucket. [default benchmark]")
+	flag.BoolVar(&debug, "debug", false, "Write debug-level logs")
+	flag.StringVar(&cbCredsUsername, "u", "Administrator", "Couchbase REST API username")
+	flag.StringVar(&cbCredsPassword, "p", "password", "Couchbase REST API password")
+
 	doLoad := flag.Bool("load", false, "Load data into couchbase.")
-	maxDocsFlag := flag.Int("i", 1000, "Number of documents for load script. [default 1000]")
-	concurrencyFlag := flag.Int("c", 10, "Maximum number of goroutines to run. [default 10]")
-	bucketFlag := flag.String("b", "benchmark", "Name of bucket. [default benchmark]")
 	doViewTest := flag.Bool("view", false, "Load test via making view queries")
 	doN1QLTest := flag.Bool("n1ql", false, "Load test via making n1ql queries")
-	debugFlag := flag.Bool("debug", false, "Write debug-level logs")
 
 	// parse arguments and assign to configuration
 	flag.Parse()
-	maxDocs = int32(*maxDocsFlag)
-	concurrency = *concurrencyFlag
-	bucketName = *bucketFlag
-	debug = *debugFlag
 
 	log.Println("Connecting to cluster...")
 	cluster := getCluster()
 	bucket := getBucket(cluster, bucketName)
 
 	if *doLoad {
-		log.Printf("Loading %v items w/ %v goroutines", maxDocs, concurrency)
+		log.Printf("Loading %v items w/ %v goroutines...", maxDocs, concurrency)
 		preLoadData(bucket)
-		os.Exit(0)
-	}
-	if *doViewTest {
+	} else if *doViewTest {
 		log.Printf("Running view queries test w/ %v goroutines...", concurrency)
-		viewTest(bucket)
-		os.Exit(0)
-	}
-	if *doN1QLTest {
+		runTest(bucket, getViewQuery)
+	} else if *doN1QLTest {
 		log.Printf("Running n1ql queries test w/ %v goroutines...", concurrency)
-		n1qlTest(bucket)
-		os.Exit(0)
+		runTest(bucket, getN1QLQuery)
 	}
 }
 
@@ -115,32 +103,61 @@ func getBucket(cluster *gocb.Cluster, bucket string) *gocb.Bucket {
 	return nil // stupid gofmt; we're just crashing here
 }
 
+type testRunner func(bucket *gocb.Bucket, emailAddress string) error
+
+// Run a test query function with a random email address in a continuous
+// loop in `concurrency` number of goroutines
+func runTest(bucket *gocb.Bucket, testFunc testRunner) {
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func(*gocb.Bucket) {
+			for {
+				emailAddress := getRandomEmailAddress()
+				if err := testFunc(bucket, emailAddress); err != nil {
+					debugPrintf("%v", err)
+				}
+			}
+		}(bucket)
+	}
+	wg.Wait()
+}
+
 // ---------------------------------------------------
-// loading test data
+// Loading test data and preparing queries and indexes
 
 func preLoadData(bucket *gocb.Bucket) {
 
-	var wg sync.WaitGroup
-	wg.Add(concurrency)
-
-	reads := make(chan int32)
-
-	go func(reads chan int32) {
-		for i := int32(0); i < maxDocs; i++ {
+	// shared source of document IDs for all loading goroutines
+	reads := make(chan int)
+	go func(reads chan int) {
+		for i := 0; i < maxDocs; i++ {
 			reads <- i
 		}
 		close(reads)
 	}(reads)
 
+	// fan-out loading documents among `concurrency` goroutines
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
 	defer stopTimer(startTimer(fmt.Sprintf("preload")))
-
 	for i := 0; i < concurrency; i++ {
 		go loadDocuments(&wg, reads, bucket)
 	}
 	wg.Wait()
+
+	defer stopTimer(startTimer(fmt.Sprintf("prepareViews")))
+	if err := createViewQuery(bucket); err != nil {
+		log.Fatal(err)
+	}
+
+	defer stopTimer(startTimer(fmt.Sprintf("prepareN1QL")))
+	if err := prepareN1QLIndex(bucket); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func loadDocuments(wg *sync.WaitGroup, reads chan int32, bucket *gocb.Bucket) {
+func loadDocuments(wg *sync.WaitGroup, reads chan int, bucket *gocb.Bucket) {
 	for docId := range reads {
 		if err := loadDoc(bucket, docId); err != nil {
 			log.Println(err)
@@ -150,7 +167,7 @@ func loadDocuments(wg *sync.WaitGroup, reads chan int32, bucket *gocb.Bucket) {
 	return
 }
 
-func loadDoc(bucket *gocb.Bucket, docId int32) error {
+func loadDoc(bucket *gocb.Bucket, docId int) error {
 	key := makeKey(docId)
 	doc := makeDoc(key)
 	if cas, err := timedInsert(bucket, key, doc, 0); err == nil {
@@ -170,28 +187,6 @@ func timedInsert(bucket *gocb.Bucket, key string, value interface{}, expiry uint
 	return bucket.Insert(key, value, expiry)
 }
 
-// ---------------------------------------------------
-// testing view queries
-
-func viewTest(bucket *gocb.Bucket) {
-
-	if err := createViewQuery(bucket); err == nil {
-		var wg sync.WaitGroup
-		wg.Add(concurrency)
-		for i := 0; i < concurrency; i++ {
-			go func(*gocb.Bucket) {
-				for {
-					emailAddress := getRandomEmailAddress()
-					getViewQuery(bucket, emailAddress)
-				}
-			}(bucket)
-		}
-		wg.Wait()
-	} else {
-		log.Fatal(err)
-	}
-}
-
 // Hit the REST API to create a view that maps email to [id, name].
 func createViewQuery(bucket *gocb.Bucket) error {
 	url := fmt.Sprintf("http://%s:8092/%s/_design/viewByEmail", getClusterIP(), bucketName)
@@ -204,9 +199,30 @@ func createViewQuery(bucket *gocb.Bucket) error {
 }`
 
 	resp, err := restApiCall("PUT", url, body, "application/json")
-	debugPrintf("%v", resp)
+	debugPrintf("createViewQuery: %v", resp)
 	return err
 }
+
+// Hit the REST API to prepare a N1QL index
+func prepareN1QLIndex(bucket *gocb.Bucket) error {
+	url := fmt.Sprintf("http://%s:8093/query/service", getClusterIP())
+
+	var body = fmt.Sprintf("statement=create primary index on %v", bucketName)
+	if resp, err := restApiFormPost(url, body); err != nil {
+		debugPrintf("create primary index: %v", resp)
+		return err
+	}
+
+	body = fmt.Sprintf("statement=prepare select * from %v where email=$1", bucketName)
+	if resp, err := restApiFormPost(url, body); err != nil {
+		debugPrintf("prepare select: %v", resp)
+		return err
+	}
+	return nil
+}
+
+// ---------------------------------------------------
+// testing view queries
 
 // Get the document associated with the emailAddress by hitting
 // the view query we created above
@@ -228,44 +244,6 @@ func getViewQuery(bucket *gocb.Bucket, emailAddress string) error {
 
 // ---------------------------------------------------
 // testing n1ql queries
-
-func n1qlTest(bucket *gocb.Bucket) {
-
-	if err := prepareN1QLIndex(bucket); err == nil {
-		var wg sync.WaitGroup
-		wg.Add(concurrency)
-		for i := 0; i < concurrency; i++ {
-			go func(*gocb.Bucket) {
-				for {
-					emailAddress := getRandomEmailAddress()
-					if err := getN1QLQuery(bucket, emailAddress); err != nil {
-						debugPrintf("%v", err)
-						os.Exit(-1)
-					}
-				}
-			}(bucket)
-		}
-		wg.Wait()
-	} else {
-		log.Fatal(err)
-	}
-}
-
-// Hit the REST API to prepare a N1QL index
-func prepareN1QLIndex(bucket *gocb.Bucket) error {
-	url := fmt.Sprintf("http://%s:8093/query/service", getClusterIP())
-	var body = fmt.Sprintf("statement=create primary index on %v", bucketName)
-
-	if resp, err := restApiFormPost(url, body); err == nil {
-		debugPrintf("%v", resp)
-		body = fmt.Sprintf("statement=prepare select * from %v where email=$1", bucketName)
-		resp, err = restApiFormPost(url, body)
-		debugPrintf("%v", resp)
-		return err
-	} else {
-		return err
-	}
-}
 
 type N1QLResult struct {
 	Results []json.RawMessage `json:"results"`
@@ -329,7 +307,7 @@ func startTimer(s string) (string, time.Time) {
 	return s, time.Now()
 }
 
-func makeKey(docId int32) string {
+func makeKey(docId int) string {
 	return fmt.Sprintf("%020d", docId)
 }
 
@@ -353,7 +331,7 @@ func getRandomString(n int) string {
 // generates a random email address within the maxDocs range, for use
 // in testing queries
 func getRandomEmailAddress() string {
-	docId := rand.Int31n(maxDocs)
+	docId := rand.Intn(maxDocs)
 	return fmt.Sprintf("%020d@joyent.com", docId)
 }
 
