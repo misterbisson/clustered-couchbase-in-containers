@@ -235,6 +235,11 @@ func prepareN1QLIndex(bucket *gocb.Bucket) error {
 		bottom = step * node
 		top = bottom + step
 		body = fmt.Sprintf(statement, node, bucketName, bottom, top, ip)
+
+		// make sure there's no existing index
+		resp, _ := restApiFormPost(url, fmt.Sprintf("statement=DROP INDEX benchmark.byEmail%v", node))
+		debugPrintf("%v", resp)
+
 		debugPrintf("prepareN1QLIndex:GSI:%v", body)
 		if resp, err := restApiFormPost(url, body); err != nil {
 			debugPrintf("prepareN1QLIndex:GSI:%v", resp)
