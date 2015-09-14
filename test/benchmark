@@ -10,6 +10,9 @@ COMMANDS:
   load: run cbc-benchmark to load data in for testing. any <args> passed in
         will be passed through to the cbc-benchmark executable.
 
+  index: run cbc-benchmark to build indexes and prepare views. runs on a
+         maximum of one node.
+
   view: run cbc-benchmark to test views. any <args> passed in will be passed
         through to the cbc-benchmark executable.
 
@@ -54,8 +57,9 @@ get_links() {
     done
 }
 
-# load and test just wrap run with the appropriate command flag
+# these commands just wrap run with the appropriate command flag
 load() { run ${@}; }
+index() { NUM=1; run ${@}; }
 view() { run ${@}; }
 n1ql() { run ${@}; }
 
@@ -64,7 +68,7 @@ run() {
     for i in $(seq $NUM)
     do
         docker run -d \
-               --name ${PREFIX}_benchmark_$i \
+               --name ${PREFIX}_benchmark_${cmd}_$i \
                $LINKS \
                0x74696d/cbc-benchmark \
                -$cmd -b ${BUCKET} ${@}

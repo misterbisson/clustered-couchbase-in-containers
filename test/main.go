@@ -38,6 +38,7 @@ func main() {
 	flag.StringVar(&cbCredsPassword, "p", "password", "Couchbase REST API password")
 
 	doLoad := flag.Bool("load", false, "Load data into couchbase.")
+	doIndex := flag.Bool("index", false, "Set up indexes and queries on couchbase.")
 	doViewTest := flag.Bool("view", false, "Load test via making view queries")
 	doN1QLTest := flag.Bool("n1ql", false, "Load test via making n1ql queries")
 
@@ -51,6 +52,8 @@ func main() {
 	if *doLoad {
 		log.Printf("Loading %v items w/ %v goroutines...", maxDocs, concurrency)
 		preLoadData(bucket)
+	} else if *doIndex {
+		buildIndexes(bucket)
 	} else if *doViewTest {
 		log.Printf("Running view queries test w/ %v goroutines...", concurrency)
 		runTest(bucket, getViewQuery)
@@ -149,6 +152,9 @@ func preLoadData(bucket *gocb.Bucket) {
 		go loadDocuments(&wg, reads, bucket)
 	}
 	wg.Wait()
+}
+
+func buildIndexes(bucket *gocb.Bucket) {
 
 	defer stopTimer(startTimer(fmt.Sprintf("prepareViews")))
 	if err := createViewQuery(bucket); err != nil {
