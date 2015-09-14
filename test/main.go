@@ -11,6 +11,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -64,8 +65,8 @@ func main() {
 
 // query consul for the IP of the first CB node we find
 // equivalent of `curl -s http://consul:8500/v1/catalog/service/couchbase`
-func getClusterIP() string {
-	var ip string
+func getClusterIPs() []string {
+	var ips = []string{}
 	config := &consul.Config{Address: "consul:8500"}
 	if client, err := consul.NewClient(config); err != nil {
 		log.Fatal(err)
@@ -75,17 +76,20 @@ func getClusterIP() string {
 			log.Fatal(err)
 		} else {
 			if len(service) > 0 {
-				ip = service[0].ServiceAddress
+				for _, ip := range service {
+					ips = append(ips, ip.ServiceAddress)
+				}
 			} else {
 				log.Fatal("no IPs found for couchbase")
 			}
 		}
 	}
-	return ip
+	return ips
 }
 
 func getCluster() *gocb.Cluster {
-	url := fmt.Sprintf("couchbase://%s:8092", getClusterIP())
+	ips := getClusterIPs()
+	url := fmt.Sprintf("couchbase://%v:8092", strings.Join(ips, ","))
 	if cluster, err := gocb.Connect(url); err != nil {
 		log.Fatal(err)
 	} else {
@@ -189,7 +193,7 @@ func timedInsert(bucket *gocb.Bucket, key string, value interface{}, expiry uint
 
 // Hit the REST API to create a view that maps email to [id, name].
 func createViewQuery(bucket *gocb.Bucket) error {
-	url := fmt.Sprintf("http://%s:8092/%s/_design/viewByEmail", getClusterIP(), bucketName)
+	url := fmt.Sprintf("http://%s:8092/%s/_design/viewByEmail", getClusterIPs()[0], bucketName)
 	var body = `{
   "views": {
     "byEmail": {
@@ -205,19 +209,35 @@ func createViewQuery(bucket *gocb.Bucket) error {
 
 // Hit the REST API to prepare a N1QL index
 func prepareN1QLIndex(bucket *gocb.Bucket) error {
-	url := fmt.Sprintf("http://%s:8093/query/service", getClusterIP())
 
+	nodes := getClusterIPs()
+	url := fmt.Sprintf("http://%s:8093/query/service", nodes[0])
 	var body = fmt.Sprintf("statement=create primary index on %v", bucketName)
 	if resp, err := restApiFormPost(url, body); err != nil {
-		debugPrintf("create primary index: %v", resp)
+		debugPrintf("prepareN1QLIndex:primary:%v", resp)
 		return err
 	}
 
-	body = fmt.Sprintf("statement=prepare select * from %v where email=$1", bucketName)
-	if resp, err := restApiFormPost(url, body); err != nil {
-		debugPrintf("prepare select: %v", resp)
-		return err
+	var (
+		bottom int = 0
+		top    int = 0
+	)
+	statement := "statement=CREATE INDEX byEmail%v ON %v(email) WHERE email >= '%020d@joyent.com' AND email < '%020d@joyent.com' WITH {\"nodes\": [\"%v:8091\"]}"
+
+	step := int(maxDocs / len(nodes))
+	for node, ip := range nodes {
+		bottom = step * node
+		top = bottom + step
+		body = fmt.Sprintf(statement, node, bucketName, bottom, top, ip)
+		debugPrintf("prepareN1QLIndex:GSI:%v", body)
+		if resp, err := restApiFormPost(url, body); err != nil {
+			debugPrintf("prepareN1QLIndex:GSI:%v", resp)
+			return err
+		} else {
+			debugPrintf("%v", resp)
+		}
 	}
+
 	return nil
 }
 
@@ -251,24 +271,18 @@ type N1QLResult struct {
 
 // Get the document associated with the emailAddress by making a N1QL query
 func getN1QLQuery(bucket *gocb.Bucket, emailAddress string) error {
-	url := fmt.Sprintf("http://%s:8093/query/service", getClusterIP())
-	var body = fmt.Sprintf("statement=select * from %v where email='%v'", bucketName, emailAddress)
-	defer stopTimer(startTimer(fmt.Sprintf("n1qlquery:%v", emailAddress)))
-	if resp, err := restApiFormPost(url, body); err != nil {
+	qbody := fmt.Sprintf("SELECT id, name FROM %v WHERE email = '%v'", bucketName, emailAddress)
+	byEmailQuery := gocb.NewN1qlQuery(qbody) // defaults to adhoc=true
+	var row interface{}
+
+	defer stopTimer(startTimer(fmt.Sprintf("n1qlQuery:%v", emailAddress)))
+	if rows, err := bucket.ExecuteN1qlQuery(byEmailQuery, nil); err != nil {
 		return err
 	} else {
-		if debug {
-			var result N1QLResult
-			if err := json.Unmarshal([]byte(resp), &result); err != nil {
-				log.Printf(resp)
-				return err
-			}
-			if len(result.Results) > 0 {
-				log.Printf("%v", string(result.Results[0]))
-			}
-		}
+		rows.One(&row)
+		debugPrintf("%v", row)
+		return rows.Close()
 	}
-	return nil
 }
 
 // ---------------------------------------------------
