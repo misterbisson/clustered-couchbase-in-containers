@@ -6,7 +6,7 @@ SHELL := /bin/bash
 ROOT := $(shell pwd)
 
 clean:
-	rm -rf build
+	rm -rf build .godeps
 
 # builds the build container, which contains everything we need
 # to build and test cbc-benchmark, but that we don't want to ship
@@ -15,9 +15,14 @@ clean:
 	docker build -t=golang-alpine -f=Dockerfile-builder .
 	@touch .build-builder
 
+.godeps:
+	mkdir -p .godeps/
+	GOPATH=${ROOT}/.godeps:${ROOT} go get github.com/couchbase/gocb
+	GOPATH=${ROOT}/.godeps:${ROOT} go get github.com/hashicorp/consul/api
+
 # grabs the binary and shared lib we need from the builder image
 # and drops them into the much leaner production deployment image
-build: .build-builder
+build: .build-builder .godeps
 	mkdir -p build
 	docker run -it --name cbc-build \
 		-e CGO_ENABLED=0 \
