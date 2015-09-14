@@ -289,7 +289,7 @@ func restApiCall(method, url, body, contentType string) error {
 
 func stopTimer(s string, startTime time.Time) {
 	endTime := time.Now()
-	log.Printf("time,%v,%v", s, endTime.Sub(startTime))
+	log.Printf("time,%v,%vms", s, int64(endTime.Sub(startTime)/time.Millisecond))
 }
 
 func startTimer(s string) (string, time.Time) {
