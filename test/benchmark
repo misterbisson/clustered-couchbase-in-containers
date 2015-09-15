@@ -60,7 +60,7 @@ get_links() {
 
 # these commands just wrap run with the appropriate command flag
 load() { run ${@}; }
-index() { NUM=1; run ${@}; }
+index() { NUM=1; run ${@} -debug; } # always run index w/ debug
 view() { run ${@}; }
 n1ql() { run ${@}; }
 
@@ -74,7 +74,7 @@ run() {
                --label=benchmark \
                $LINKS \
                0x74696d/cbc-benchmark \
-               -${cmd} -b ${BUCKET} ${@}
+               /bin/cbc-benchmark -${cmd} -b ${BUCKET} ${@}
     done
 }
 
