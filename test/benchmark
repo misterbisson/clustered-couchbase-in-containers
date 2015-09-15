@@ -55,6 +55,7 @@ get_links() {
     do
         LINKS="$LINKS --link $container:$container "
     done
+    echo $LINKS
 }
 
 # these commands just wrap run with the appropriate command flag
@@ -67,16 +68,20 @@ run() {
     get_links
     for i in $(seq $NUM)
     do
-        docker run -d \
-               --name ${PREFIX}_benchmark_${cmd}_$i \
+        # by labelling and not naming the benchmark containers, we can
+        # more easily add another n nodes without tearing down first
+        docker run -m 4g -d \
+               --label=benchmark \
                $LINKS \
                0x74696d/cbc-benchmark \
-               -$cmd -b ${BUCKET} ${@}
+               -${cmd} -b ${BUCKET} ${@}
     done
 }
 
 stop() {
-    for container in $(docker ps -a | awk -F' +' '/ '${PREFIX}'_benchmark_/{print $NF}')
+    # filter for those containers labelled benchmark but make sure we don't try
+    # to grab the header too.
+    for container in $(docker ps -a --filter 'label=benchmark' | awk -F' +' '/cbc-benchmark/{print $NF}')
     do
         docker stop $container || true
         docker rm $container

@@ -11,6 +11,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,8 @@ var (
 
 func main() {
 
+	// set up our runtime environment
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	rand.Seed(time.Now().Unix())
 
 	flag.IntVar(&maxDocs, "i", 1000, "Number of documents for load script. [default 1000]")
@@ -123,6 +126,11 @@ func runTest(bucket *gocb.Bucket, testFunc testRunner) {
 				emailAddress := getRandomEmailAddress()
 				if err := testFunc(bucket, emailAddress); err != nil {
 					debugPrintf("%v", err)
+				}
+				if debug {
+					if rand.Intn(10) == 1 {
+						debugPrintf("goroutines:%v", runtime.NumGoroutine())
+					}
 				}
 			}
 		}(bucket)
@@ -228,7 +236,7 @@ func prepareN1QLIndex(bucket *gocb.Bucket) error {
 		bottom int = 0
 		top    int = 0
 	)
-	statement := "statement=CREATE INDEX byEmail%v ON %v(email) WHERE email >= '%020d@joyent.com' AND email < '%020d@joyent.com' WITH {\"nodes\": [\"%v:8091\"]}"
+	statement := "statement=CREATE INDEX byEmail%v ON %v(email) WHERE email >= '%020d@joyent.com' AND email < '%020d@joyent.com' WITH {\"nodes\": [\"%v:8091\"]}&timeout=5m"
 
 	step := int(maxDocs / len(nodes))
 	for node, ip := range nodes {
@@ -313,7 +321,7 @@ func restApiCall(method, url, body, contentType string) (string, error) {
 	req.SetBasicAuth(cbCredsUsername, cbCredsPassword)
 	req.Header.Set("Content-Type", contentType)
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: time.Duration(5 * time.Minute)}
 	if resp, err := client.Do(req); err != nil {
 		return "", err
 	} else {
