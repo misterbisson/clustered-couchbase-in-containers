@@ -3,7 +3,7 @@
 #
 consul:
     image: progrium/consul:latest
-    command: -server -bootstrap -ui-dir /ui
+    command: -server -bootstrap-expect 1 -ui-dir /ui
     mem_limit: 256m
     ports:
     - 53
@@ -18,21 +18,6 @@ consul:
 # Manually bootstrap the first instance, then...
 # Scale this tier and each additional container/instance will automatically self-configure as a member of the cluster
 #
-couchbase3:
-    image: misterbisson/triton-couchbase
-    links:
-    - consul
-    mem_limit: 222g
-    ports:
-    - 8091
-    - 8092
-    - 11207
-    - 11210
-    - 11211
-    - 18091
-    - 18092
-    restart: always
-
 couchbase4:
     image: 0x74696d/triton-couchbase:4.0.0
     links:
@@ -47,3 +32,50 @@ couchbase4:
     - 18091
     - 18092
     restart: always
+
+# run the client to create indexes. this client will exit when complete
+benchmark_index:
+    image: 0x74696d/cbc-benchmark
+    links:
+    - consul
+    - couchbase4
+    environment:
+    - ITEMS=1000000
+    command: /bin/cbc-benchmark index
+    restart: never
+
+# run the client to load test data. this client will exit when complete
+benchmark_load:
+    image: 0x74696d/cbc-benchmark
+    links:
+    - consul
+    - couchbase4
+    environment:
+    - ITEMS=1000000
+    command: /bin/cbc-benchmark load
+    restart: never
+
+# run the client to benchmark n1ql queries
+benchmark_n1ql:
+    image: 0x74696d/cbc-benchmark
+    mem_limit: 8g
+    links:
+    - consul
+    - couchbase4
+    environment:
+    - ITEMS=1000000
+    - THREADS=10
+    command: /bin/cbc-benchmark n1qlTest
+
+# TODO
+# run the client to benchmark view queries
+benchmark_views:
+    image: 0x74696d/cbc-benchmark
+    mem_limit: 8g
+    links:
+    - consul
+    - couchbase4
+    environment:
+    - ITEMS=1000000
+    - THREADS=10
+    command: /bin/cbc-benchmark view

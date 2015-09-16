@@ -1,5 +1,14 @@
-FROM gliderlabs/alpine:3.2
-RUN apk update && apk add bash curl ca-certificates && rm -rf /var/cache/apk/*
-ADD cbc-benchmark bin/
+# Container for running Couchbase benchmarks
+FROM node:slim
 
-CMD ["cbc-benchmark"]
+# for parsing JSON output from Consul
+RUN npm install -g json
+
+# add the script we need to run
+ADD cbc-benchmark /bin/cbc-benchmark
+
+# add the binary and lib we got from our builder container
+ADD build/cbc-pillowfight /bin
+ADD build/cbc-n1qlback /bin
+ADD build/libcouchbase.so.2.0.28 /lib/x86_64-linux-gnu
+RUN ln -s /lib/x86_64-linux-gnu/libcouchbase.so.2.0.28 /lib/x86_64-linux-gnu/libcouchbase.so.2
