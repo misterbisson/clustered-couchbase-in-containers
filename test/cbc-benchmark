@@ -43,7 +43,7 @@ prepareN1QLIndex() {
     IP=${CLUSTER_IPS[0]}
     curl -L \
          http://${IP}:8093/query/service \
-         -d 'statement=CREATE PRIMARY INDEX ON benchmark'
+         -d 'statement=\"CREATE PRIMARY INDEX ON benchmark\"'
 
     local numNodes=${#CLUSTER_IPS[*]}
     local bottom=0
@@ -60,7 +60,7 @@ prepareN1QLIndex() {
         echo Creating index ${index}
         curl -Lsf \
              http://${IP}:8093/query/service \
-             -d "statement=DROP INDEX benchmark.byEmail${node}"
+             -d "statement=\"DROP INDEX benchmark.byEmail${node}\""
         curl -L \
              http://${IP}:8093/query/service \
              -d "statement=${index}&timeout=5m"
@@ -73,19 +73,22 @@ index() {
     prepareN1QLIndex
 }
 
+loadDoc() {
+    IP=$1
+    local docId=$(printf "%020d" $2)
+    local email=${docId}@joyent.com
+    local name=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 20 | head -n 1)
+    local insert="INSERT INTO benchmark (KEY, VALUE) VALUES (\"$docId\", {\"email\": \"$email\", \"name\": \"$name\"})"
+    echo Inserting $docId: $email, $name
+    curl -L \
+         http://${IP}:8093/query/service \
+         -d "statement=${insert}"
+}
+export -f loadDoc
+
 load() {
     IP=${CLUSTER_IPS[0]}
-    for i in $(seq ${ITEMS})
-    do
-        local docId=$(printf "%020d" $i)
-        local email=${docId}@joyent.com
-        local name=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 20 | head -n 1)
-        local insert="INSERT INTO benchmark (KEY, VALUE) VALUES (\"$docId\", {\"email\": \"$email\", \"name\": \"$name\"})"
-        echo Inserting $id: $email, $name
-        curl -L \
-             http://${IP}:8093/query/service \
-             -d "statement=${insert}"
-    done
+    seq ${ITEMS} | xargs -n2 -P 40 -I{} bash -c "loadDoc $IP {}"
 }
 
 # generate 30 random queries so we distribute load across the cluster
@@ -108,6 +111,18 @@ n1qlTest() {
                       --timings \
                       -U couchbase://${IP}/benchmark
 }
+
+# run cbc-pillowfight
+pillowfight() {
+    echo Running pillowfight...
+    IP=${CLUSTER_IPS[0]}
+    /bin/cbc-pillowfight --num-items=${ITEMS} \
+                         --num-threads=${THREADS} \
+                         --no-population \
+                         --timings \
+                         -U couchbase://${IP}/benchmark
+}
+
 
 getClusterIps
 cmd="${1:-usage}"

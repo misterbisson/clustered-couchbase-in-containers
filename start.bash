@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PREFIX=ccic
+PREFIX=${PREFIX:-ccic}
 export DOCKER_CLIENT_TIMEOUT=300
 
 echo 'Starting Couchbase cluster'
