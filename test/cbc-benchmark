@@ -43,7 +43,7 @@ prepareN1QLIndex() {
     IP=${CLUSTER_IPS[0]}
     curl -L \
          http://${IP}:8093/query/service \
-         -d 'statement=\"CREATE PRIMARY INDEX ON benchmark\"'
+         -d 'statement=CREATE PRIMARY INDEX ON benchmark'
 
     local numNodes=${#CLUSTER_IPS[*]}
     local bottom=0
