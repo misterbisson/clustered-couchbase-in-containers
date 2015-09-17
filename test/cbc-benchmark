@@ -3,7 +3,7 @@
 CLUSTER_IPS=()
 ITEMS=${ITEMS:-1000}
 THREADS=${THREADS:-10}
-
+TIMINGS=${TIMINGS:-}
 usage() {
     cat <<EOF
 usage: $0 [COMMAND]
@@ -108,8 +108,8 @@ n1qlTest() {
     IP=${CLUSTER_IPS[0]}
     /bin/cbc-n1qlback --queryfile=./queries.json \
                       --num-threads=${THREADS} \
-                      --timings \
-                      -U couchbase://${IP}/benchmark
+                      -U couchbase://${IP}/benchmark \
+                      ${TIMINGS}
 }
 
 # run cbc-pillowfight
@@ -119,8 +119,8 @@ pillowfight() {
     /bin/cbc-pillowfight --num-items=${ITEMS} \
                          --num-threads=${THREADS} \
                          --no-population \
-                         --timings \
-                         -U couchbase://${IP}/benchmark
+                         -U couchbase://${IP}/benchmark \
+                         ${TIMINGS}
 }
 
 

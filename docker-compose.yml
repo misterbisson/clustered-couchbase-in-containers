@@ -75,7 +75,7 @@ benchmark_n1ql:
     - consul
     environment:
     - ITEMS=1000000
-    - THREADS=10
+    - THREADS=1
     command: /bin/cbc-benchmark n1qlTest
 
 # run the client to benchmark via pillowfight
