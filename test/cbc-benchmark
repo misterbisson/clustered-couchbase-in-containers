@@ -1,0 +1,130 @@
+#!/bin/bash
+
+CLUSTER_IPS=()
+ITEMS=${ITEMS:-1000}
+THREADS=${THREADS:-10}
+
+usage() {
+    cat <<EOF
+usage: $0 [COMMAND]
+
+Runs couchbase benchmarks, for fun and sparkles.
+
+COMMANDS:
+  load: load data in for testing up to ${INDEX} number of items
+  index: prepare indexes and views for benchmark
+  n1ql: generate test load and run cbc-n1qlback benchmark against cluster
+  view: generate test load and run <TODO> benchmark against cluster
+
+EOF
+}
+
+# find a cluster IP
+getClusterIps() {
+    for ip in $(curl -Ls http://consul:8500/v1/catalog/service/couchbase | json -aH ServiceAddress)
+    do
+        CLUSTER_IPS+=(${ip})
+    done
+    echo CB cluster IPs: ${CLUSTER_IPS[*]}
+}
+
+createViewQuery() {
+    echo Creating view query...
+    IP=${CLUSTER_IPS[0]}
+    curl -Ls \
+         -X PUT \
+         -H "Content-Type: application/json" \
+         http://${IP}:8092/benchmark/_design/viewByEmail \
+         -d '{"views": {"byEmail": {"map": "function (doc, meta) {emit(doc.email, [meta.id, doc.name]);}"}}}'
+}
+
+prepareN1QLIndex() {
+    echo Creating n1ql indexes...
+    IP=${CLUSTER_IPS[0]}
+    curl -L \
+         http://${IP}:8093/query/service \
+         -d 'statement=CREATE PRIMARY INDEX ON benchmark'
+
+    local numNodes=${#CLUSTER_IPS[*]}
+    local bottom=0
+    local top=0
+    local node=0
+    local step=$(expr ${ITEMS} / ${numNodes})
+    for ip in ${CLUSTER_IPS[*]}
+    do
+        bottom=$(expr $step \* $node)
+        top=$(expr $bottom + $step)
+        local bottomEmail=$(printf "%020d" $bottom)@joyent.com
+        local topEmail=$(printf "%020d" $top)@joyent.com
+        local index="CREATE INDEX byEmail${node} ON benchmark(email) WHERE email >= \"${bottomEmail}\" AND email < \"${topEmail}\" WITH {\"nodes\": [\"${ip}:8091\"]}\""
+        echo Creating index ${index}
+        curl -Lsf \
+             http://${IP}:8093/query/service \
+             -d "statement=\"DROP INDEX benchmark.byEmail${node}\""
+        curl -L \
+             http://${IP}:8093/query/service \
+             -d "statement=${index}&timeout=5m"
+        node=$(expr ${node} + 1)
+    done
+}
+
+index() {
+    createViewQuery
+    prepareN1QLIndex
+}
+
+loadDoc() {
+    IP=$1
+    local docId=$(printf "%020d" $2)
+    local email=${docId}@joyent.com
+    local name=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 20 | head -n 1)
+    local insert="INSERT INTO benchmark (KEY, VALUE) VALUES (\"$docId\", {\"email\": \"$email\", \"name\": \"$name\"})"
+    echo Inserting $docId: $email, $name
+    curl -L \
+         http://${IP}:8093/query/service \
+         -d "statement=${insert}"
+}
+export -f loadDoc
+
+load() {
+    IP=${CLUSTER_IPS[0]}
+    seq ${ITEMS} | xargs -n2 -P 40 -I{} bash -c "loadDoc $IP {}"
+}
+
+# generate 30 random queries so we distribute load across the cluster
+generate() {
+    for i in $(seq 30)
+    do
+        local docId=$(printf "%020d" $[RANDOM % ${ITEMS}])
+        local email=${docId}@joyent.com
+        echo "{\"statement\": \"SELECT id, name FROM benchmark WHERE email = '"$email"'\"}" >> ./queries.json
+    done
+}
+
+# run cbc-n1qlback as a stress test against the cluster
+n1qlTest() {
+    generate
+    echo Load testing n1ql queries...
+    IP=${CLUSTER_IPS[0]}
+    /bin/cbc-n1qlback --queryfile=./queries.json \
+                      --num-threads=${THREADS} \
+                      --timings \
+                      -U couchbase://${IP}/benchmark
+}
+
+# run cbc-pillowfight
+pillowfight() {
+    echo Running pillowfight...
+    IP=${CLUSTER_IPS[0]}
+    /bin/cbc-pillowfight --num-items=${ITEMS} \
+                         --num-threads=${THREADS} \
+                         --no-population \
+                         --timings \
+                         -U couchbase://${IP}/benchmark
+}
+
+
+getClusterIps
+cmd="${1:-usage}"
+shift
+$cmd "$@"

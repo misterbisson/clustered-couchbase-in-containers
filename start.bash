@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PREFIX=ccic
+PREFIX=${PREFIX:-ccic}
 export DOCKER_CLIENT_TIMEOUT=300
 
 echo 'Starting Couchbase cluster'
@@ -11,10 +11,12 @@ docker-compose pull
 
 echo
 echo 'Starting containers'
-docker-compose --project-name=$PREFIX up -d --no-recreate --timeout=300
+# starts the couchbase containers and their deps but not the benchmark
+# client container
+docker-compose --project-name=$PREFIX up -d --no-recreate --timeout=300 couchbase
 
 echo
-echo -n 'Initilizing cluster.'
+echo -n 'Initializing cluster.'
 
 sleep 1.3
 COUCHBASERESPONSIVE=0
