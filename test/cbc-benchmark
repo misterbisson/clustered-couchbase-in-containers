@@ -98,9 +98,12 @@ load() {
 generate() {
     for i in $(seq ${QUERIES})
     do
-        local docId=$(printf "%020d" $[RANDOM % ${ITEMS}])
+        local docId=$[RANDOM % ${ITEMS}]
+        local step=$(expr ${ITEMS} / $(expr ${#CLUSTER_IPS} + 1) )
+        local node=$(expr ${docId} / ${step} )
+        docId=$(printf "%020d" ${docId})
         local email=${docId}@joyent.com
-        echo "{\"statement\": \"SELECT id, name FROM benchmark WHERE email = '"$email"'\"}" >> ./queries.json
+        echo "{\"statement\": \"SELECT id, name FROM benchmark USE INDEX(byEmail$node) WHERE email = '"$email"'\"}" >> ./queries.json
     done
 }
 
