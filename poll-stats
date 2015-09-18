@@ -11,16 +11,16 @@ NAME=$1
 
 while true
 do
-    DATE=$(date "+%Y:%m:%d-%H:%M:%SZ")
+    DATE=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
     mkdir -p ./stats
 
     echo polling stats at ${DATE}...
-    curl -so ./stats/${NAME}-cluster-${DATE}.json "http://Administrator:password@165.225.157.162:8091/pools/default"
-    curl -so ./stats/${NAME}-stats-${DATE}.json "http://Administrator:password@165.225.157.162:8091/pools/default/overviewStats"
+    curl -so ./stats/${NAME}-${DATE}-cluster.json "http://Administrator:password@165.225.157.162:8091/pools/default"
+    curl -so ./stats/${NAME}-${DATE}-stats.json "http://Administrator:password@165.225.157.162:8091/pools/default/overviewStats"
 
     echo pushing up to manta...
-    mput -a timgross -f ./stats/${NAME}-cluster-${DATE}.json /timgross/public
-    mput -a timgross -f ./stats/${NAME}-stats-${DATE}.json /timgross/public
+    mput -a timgross -f ./stats/${NAME}-${DATE}-cluster.json /timgross/public
+    mput -a timgross -f ./stats/${NAME}-${DATE}-stats.json /timgross/public
 
     sleep 30
 done
