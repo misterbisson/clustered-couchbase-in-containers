@@ -4,6 +4,9 @@ CLUSTER_IPS=()
 ITEMS=${ITEMS:-1000}
 THREADS=${THREADS:-10}
 TIMINGS=${TIMINGS:-}
+QUERIES=${QUERIES:-30}
+
+
 usage() {
     cat <<EOF
 usage: $0 [COMMAND]
@@ -93,7 +96,7 @@ load() {
 
 # generate 30 random queries so we distribute load across the cluster
 generate() {
-    for i in $(seq 30)
+    for i in $(seq ${QUERIES})
     do
         local docId=$(printf "%020d" $[RANDOM % ${ITEMS}])
         local email=${docId}@joyent.com
