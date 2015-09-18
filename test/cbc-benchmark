@@ -121,7 +121,6 @@ pillowfight() {
     IP=${CLUSTER_IPS[0]}
     /bin/cbc-pillowfight --num-items=${ITEMS} \
                          --num-threads=${THREADS} \
-                         --no-population \
                          -U couchbase://${IP}/benchmark \
                          ${TIMINGS}
 }
