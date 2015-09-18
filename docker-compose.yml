@@ -22,7 +22,7 @@ couchbase4:
     image: 0x74696d/triton-couchbase:4.0.0
     links:
     - consul
-    mem_limit: 222g
+    mem_limit: 128g
     ports:
     - 8091
     - 8092
@@ -37,7 +37,7 @@ couchbase3:
     image: misterbisson/triton-couchbase
     links:
     - consul
-    mem_limit: 222g
+    mem_limit: 128g
     ports:
     - 8091
     - 8092
@@ -74,7 +74,7 @@ benchmark_index:
 # run the client to load test data. this client will exit when complete
 benchmark_load:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 1g
     links:
     - consul
     environment:
@@ -85,7 +85,7 @@ benchmark_load:
 # run the client to benchmark n1ql queries
 benchmark_n1ql:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 64g
     links:
     - consul
     environment:
@@ -96,7 +96,7 @@ benchmark_n1ql:
 # run the client to benchmark via pillowfight
 benchmark_pillowfight:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 64g
     links:
     - consul
     environment:
@@ -107,7 +107,7 @@ benchmark_pillowfight:
 # run the client to benchmark view queries
 benchmark_views:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 64g
     links:
     - consul
     environment:
