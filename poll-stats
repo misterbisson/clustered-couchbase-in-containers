@@ -9,6 +9,8 @@
 
 NAME=$1
 
+mmkdir -pa timgross /timgross/public/cb4
+
 while true
 do
     DATE=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
@@ -19,8 +21,8 @@ do
     curl -so ./stats/${NAME}-${DATE}-stats.json "http://Administrator:password@165.225.157.162:8091/pools/default/overviewStats"
 
     echo pushing up to manta...
-    mput -a timgross -f ./stats/${NAME}-${DATE}-cluster.json /timgross/public
-    mput -a timgross -f ./stats/${NAME}-${DATE}-stats.json /timgross/public
+    mput -a timgross -f ./stats/${NAME}-${DATE}-cluster.json /timgross/public/cb4
+    mput -a timgross -f ./stats/${NAME}-${DATE}-stats.json /timgross/public/cb4
 
     sleep 30
 done
