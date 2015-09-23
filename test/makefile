@@ -18,6 +18,7 @@ clean:
 build: .build-builder
 	mkdir -p build
 	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/lib/libcouchbase.so.2.0.28 - > build/libcouchbase.so.2.0.28
+	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/bin/cbq - > build/cbq
 	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/bin/cbc-pillowfight - > build/cbc-pillowfight
 	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/bin/cbc-n1qlback - > build/cbc-n1qlback
 	docker build -t="0x74696d/cbc-benchmark" -f=Dockerfile .
