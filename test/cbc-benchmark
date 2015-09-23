@@ -5,7 +5,7 @@ ITEMS=${ITEMS:-1000}
 THREADS=${THREADS:-10}
 TIMINGS=${TIMINGS:-}
 QUERIES=${QUERIES:-30}
-
+CYCLES=${CYCLES:-468750000}
 
 usage() {
     cat <<EOF
@@ -122,12 +122,20 @@ n1qlTest() {
 pillowfight() {
     echo Running pillowfight...
     IP=${CLUSTER_IPS[0]}
-    /bin/cbc-pillowfight --num-items=${ITEMS} \
+    /bin/cbc-pillowfight --min-size=200 \
+                         --max-size=200 \
                          --num-threads=${THREADS} \
-                         -U couchbase://${IP}/benchmark \
-                         ${TIMINGS}
+                         --num-items=${ITEMS} \
+                         --set-pct=100 \
+                         --batch-size=50 \
+                         --rate-limit=20000 \
+                         --tokens=275 \
+                         --no-population \
+                         --sequential \
+                         --durability \
+                         --num-cycles=${CYCLES} \
+                         -U couchbase://${IP}/benchmark
 }
-
 
 getClusterIps
 cmd="${1:-usage}"

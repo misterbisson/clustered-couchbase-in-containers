@@ -100,7 +100,7 @@ benchmark_pillowfight:
     links:
     - consul
     environment:
-    - ITEMS=1000000
+    - ITEMS=93750000
     - THREADS=30
     command: /bin/cbc-benchmark pillowfight
 
