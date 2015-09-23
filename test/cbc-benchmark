@@ -96,11 +96,13 @@ load() {
 
 # generate 30 random queries so we distribute load across the cluster
 generate() {
+    local numNodes=${#CLUSTER_IPS[*]}
+    local step=$(expr ${ITEMS} / ${numNodes})
     for i in $(seq ${QUERIES})
     do
         local docId=$[RANDOM % ${ITEMS}]
-        local step=$(expr ${ITEMS} / $(expr ${#CLUSTER_IPS} + 1) )
         local node=$(expr ${docId} / ${step} )
+        node=$(( node < numNodes ? node : numNodes-1 )) # handle overflow at end of range
         docId=$(printf "%020d" ${docId})
         local email=${docId}@joyent.com
         echo "{\"statement\": \"SELECT id, name FROM benchmark USE INDEX(byEmail$node) WHERE email = '"$email"'\"}" >> ./queries.json
