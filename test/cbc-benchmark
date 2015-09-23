@@ -6,6 +6,7 @@ THREADS=${THREADS:-10}
 TIMINGS=${TIMINGS:-}
 QUERIES=${QUERIES:-30}
 CYCLES=${CYCLES:-468750000}
+TIMEOUT=${TIMEOUT:-5000000}
 
 usage() {
     cat <<EOF
@@ -135,6 +136,7 @@ pillowfight() {
                          --no-population \
                          --sequential \
                          --durability \
+                         --timeout=${TIMEOUT} \
                          --num-cycles=${CYCLES} \
                          -U couchbase://${IP}/benchmark
 }
