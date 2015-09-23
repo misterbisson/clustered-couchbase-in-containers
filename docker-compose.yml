@@ -101,7 +101,7 @@ benchmark_pillowfight:
     - consul
     environment:
     - ITEMS=93750000
-    - THREADS=30
+    - THREADS=10
     command: /bin/cbc-benchmark pillowfight
 
 # run the client to benchmark view queries
