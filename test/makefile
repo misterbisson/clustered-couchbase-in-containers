@@ -20,7 +20,6 @@ build: .build-builder
 	mkdir -p build
 	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/lib/libcouchbase.so.2.0.22 - > build/libcouchbase.so.2.0.22
 	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/bin/cbc-pillowfight - > build/cbc-pillowfight
-cbc-benchmark-builder):/libcouchbase/build/bin/cbc-n1qlback - > build/cbc-n1qlback
 	docker build -t="0x74696d/cbc-benchmark" -f=Dockerfile .
 
 # push our image to the public registry
