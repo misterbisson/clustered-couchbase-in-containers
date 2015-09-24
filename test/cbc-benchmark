@@ -138,6 +138,7 @@ pillowfight() {
                          --durability \
                          --timeout=${TIMEOUT} \
                          --num-cycles=${CYCLES} \
+                         --key-prefix=$(hostname) \
                          -U couchbase://${IP}/benchmark
 }
 
