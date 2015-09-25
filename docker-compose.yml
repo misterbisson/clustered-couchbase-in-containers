@@ -101,7 +101,7 @@ benchmark_pillowfight:
     - consul
     environment:
     - ITEMS=93750000
-    - THREADS=2
+    - THREADS=20
     - TIMEOUT=10000000
     command: /bin/cbc-benchmark pillowfight
 
