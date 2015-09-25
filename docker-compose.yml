@@ -14,15 +14,30 @@ consul:
     - 8500
     restart: always
 
-#
+
 # Manually bootstrap the first instance, then...
-# Scale this tier and each additional container/instance will automatically self-configure as a member of the cluster
-#
-couchbase:
+# Scale this tier and each additional container/instance will automatically
+# self-configure as a member of the cluster
+couchbase4:
     image: 0x74696d/triton-couchbase:4.0.0
     links:
     - consul
-    mem_limit: 222g
+    mem_limit: 128g
+    ports:
+    - 8091
+    - 8092
+    - 11207
+    - 11210
+    - 11211
+    - 18091
+    - 18092
+    restart: always
+
+couchbase3:
+    image: misterbisson/triton-couchbase
+    links:
+    - consul
+    mem_limit: 128g
     ports:
     - 8091
     - 8092
@@ -59,7 +74,7 @@ benchmark_index:
 # run the client to load test data. this client will exit when complete
 benchmark_load:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 1g
     links:
     - consul
     environment:
@@ -70,7 +85,7 @@ benchmark_load:
 # run the client to benchmark n1ql queries
 benchmark_n1ql:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 64g
     links:
     - consul
     environment:
@@ -81,18 +96,19 @@ benchmark_n1ql:
 # run the client to benchmark via pillowfight
 benchmark_pillowfight:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 64g
     links:
     - consul
     environment:
-    - ITEMS=1000000
-    - THREADS=10
+    - ITEMS=93750000
+    - THREADS=20
+    - TIMEOUT=10000000
     command: /bin/cbc-benchmark pillowfight
 
 # run the client to benchmark view queries
 benchmark_views:
     image: 0x74696d/cbc-benchmark
-    mem_limit: 4g
+    mem_limit: 64g
     links:
     - consul
     environment:

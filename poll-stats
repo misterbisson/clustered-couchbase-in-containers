@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# usage:
+# ./poll-stats parameters-of-test
+# example:
+# ./poll-stats cb4-nodes3-XXgb-docs1m-pf3-threads10
+# outputs:
+# ./stats/parameters-of-test-2015:09:18-10:11:20.json
+
+NAME=$1
+
+mmkdir -pa timgross /timgross/public/cb4
+
+while true
+do
+    DATE=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
+    mkdir -p ./stats
+
+    echo polling stats at ${DATE}...
+    curl -so ./stats/${NAME}-${DATE}-cluster.json "http://Administrator:password@165.225.157.162:8091/pools/default"
+    curl -so ./stats/${NAME}-${DATE}-stats.json "http://Administrator:password@165.225.157.162:8091/pools/default/overviewStats"
+
+    echo pushing up to manta...
+    mput -a timgross -f ./stats/${NAME}-${DATE}-cluster.json /timgross/public/cb4
+    mput -a timgross -f ./stats/${NAME}-${DATE}-stats.json /timgross/public/cb4
+
+    sleep 30
+done
