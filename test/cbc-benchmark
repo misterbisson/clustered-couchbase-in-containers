@@ -125,6 +125,9 @@ n1qlTest() {
 pillowfight() {
     echo Running pillowfight...
     IP=${CLUSTER_IPS[0]}
+    h=$(hostname)
+    while true
+    do
     /bin/cbc-pillowfight --min-size=200 \
                          --max-size=200 \
                          --num-threads=${THREADS} \
@@ -138,8 +141,10 @@ pillowfight() {
                          --durability \
                          --timeout=${TIMEOUT} \
                          --num-cycles=${CYCLES} \
-                         --key-prefix=$(hostname) \
+                         --key-prefix=${h:0:4} \
                          -U couchbase://${IP}/benchmark
+    sleep 1
+    done
 }
 
 getClusterIps
