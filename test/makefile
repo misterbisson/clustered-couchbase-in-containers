@@ -5,7 +5,7 @@ SHELL := /bin/bash
 
 clean:
 	rm -f .build-builder
-	rm -rf build/
+	rm -rf build/perf build/durability
 
 # builds the build container, which contains everything we need
 # to build and test cbc-pillowfight, but that we don't want to ship
@@ -14,14 +14,25 @@ clean:
 	docker build -t="cbc-benchmark-builder" -f=Dockerfile-builder .
 	@touch .build-builder
 
-# grabs the binary and shared lib we need from the builder image
-# and drops them into the much leaner production deployment image
-build: .build-builder
-	mkdir -p build
-	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/lib/libcouchbase.so.2.0.22 - > build/libcouchbase.so.2.0.22
-	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/build/bin/cbc-pillowfight - > build/cbc-pillowfight
-	docker build -t="0x74696d/cbc-benchmark" -f=Dockerfile .
+build: build/perf build/durability
 
-# push our image to the public registry
+# Copy out the libcouchbase perf-external build to a local directory
+# and ADD it during a Docker build
+build/perf: .build-builder
+	mkdir -p build/perf
+	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/perf/libcouchbase/build/lib/libcouchbase.so.2.0.28 - > build/perf/libcouchbase.so.2.0.28
+	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/perf/libcouchbase/build/bin/cbc-pillowfight - > build/perf/cbc-pillowfight
+	docker build -t="0x74696d/cbc-benchmark-perf" -f=Dockerfile-perf .
+
+# Copy out the libcouchbase durability build to a local directory
+# and ADD it during a Docker build
+build/durability: .build-builder
+	mkdir -p build/durability
+	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/durability/libcouchbase/build/lib/libcouchbase.so.2.0.22 - > build/durability/libcouchbase.so.2.0.22
+	docker cp $(shell docker create cbc-benchmark-builder):/libcouchbase/durability/libcouchbase/build/bin/cbc-pillowfight - > build/durability/cbc-pillowfight
+	docker build -t="0x74696d/cbc-benchmark-durable" -f=Dockerfile-durable .
+
+# push our images to the public registry
 ship: build
-	docker push 0x74696d/cbc-benchmark
+	docker push 0x74696d/cbc-benchmark-durable
+	docker push 0x74696d/cbc-benchmark-perf
