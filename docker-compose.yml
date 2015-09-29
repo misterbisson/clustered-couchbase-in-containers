@@ -1,6 +1,4 @@
-#
 # Using a single Consul host is _highly_ discouraged, but yolo
-#
 consul:
     image: progrium/consul:latest
     command: -server -bootstrap-expect 1 -ui-dir /ui
@@ -48,54 +46,9 @@ couchbase3:
     - 18092
     restart: always
 
-benchmark_test:
-    image: 0x74696d/cbc-benchmark
-    mem_limit: 512m
-    volumes:
-    - ./test:/src
-    links:
-    - consul
-    environment:
-    - ITEMS=1000
-    command: /bin/bash
-    restart: never
-
-# run the client to create indexes. this client will exit when complete
-benchmark_index:
-    image: 0x74696d/cbc-benchmark
-    mem_limit: 256m
-    links:
-    - consul
-    environment:
-    - ITEMS=1000000
-    command: /bin/cbc-benchmark index
-    restart: never
-
-# run the client to load test data. this client will exit when complete
-benchmark_load:
-    image: 0x74696d/cbc-benchmark
-    mem_limit: 1g
-    links:
-    - consul
-    environment:
-    - ITEMS=1000000
-    command: /bin/cbc-benchmark load
-    restart: never
-
-# run the client to benchmark n1ql queries
-benchmark_n1ql:
-    image: 0x74696d/cbc-benchmark
-    mem_limit: 64g
-    links:
-    - consul
-    environment:
-    - ITEMS=1000000
-    - THREADS=10
-    command: /bin/cbc-benchmark n1qlTest
-
-# run the client to benchmark via pillowfight
-benchmark_pillowfight:
-    image: 0x74696d/cbc-benchmark
+# Run the pillowfight client built from the durablity_tokens branch
+pillowfight_durable:
+    image: 0x74696d/cbc-benchmark-durable
     mem_limit: 64g
     links:
     - consul
@@ -105,13 +58,14 @@ benchmark_pillowfight:
     - TIMEOUT=10000000
     command: /bin/cbc-benchmark pillowfight
 
-# run the client to benchmark view queries
-benchmark_views:
-    image: 0x74696d/cbc-benchmark
+# Run the current pillowfight client
+pillowfight_current:
+    image: 0x74696d/cbc-benchmark-perf
     mem_limit: 64g
     links:
     - consul
     environment:
-    - ITEMS=1000000
-    - THREADS=10
-    command: /bin/cbc-benchmark view
+    - ITEMS=93750000
+    - THREADS=20
+    - TIMEOUT=10000000
+    command: /bin/cbc-benchmark pillowfight

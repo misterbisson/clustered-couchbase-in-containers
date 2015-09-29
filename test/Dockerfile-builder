@@ -11,7 +11,16 @@ RUN curl -O http://www.cmake.org/files/v3.3/cmake-3.3.1-Linux-x86_64.tar.gz && \
     mv cmake-3.3.1-Linux-x86_64/bin/* /usr/bin && \
     mv cmake-3.3.1-Linux-x86_64/share/cmake-3.3 /usr/share
 
-RUN git clone https://github.com/dhaikney/libcouchbase.git -b durability_tokens
+# build the durability_tokens branch from the published Google benchmark
+RUN mkdir -p /libcouchbase/durability && \
+    cd /libcouchbase/durability && \
+    git clone https://github.com/dhaikney/libcouchbase.git -b durability_tokens && \
+    cd libcouchbase && mkdir build && cd build && \
+    ../cmake/configure && make && ctest
 
-RUN mkdir -p libcouchbase/build
-RUN cd libcouchbase/build && ../cmake/configure && make && ctest
+# build the perf-external branch from Couchbase
+RUN mkdir -p /libcouchbase/perf/build && \
+    cd /libcouchbase/perf && \
+    git clone git://github.com/mnunberg/libcouchbase.git -b perf-external && \
+    cd libcouchbase && mkdir build && cd build && \
+    ../cmake/configure && make && ctest
