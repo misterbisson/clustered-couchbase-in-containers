@@ -56,10 +56,11 @@ pillowfight_durable:
     - ITEMS=93750000
     - THREADS=20
     - TIMEOUT=10000000
+    - EXTRA_ARGS=--tokens=275 --durability
     command: /bin/cbc-benchmark pillowfight
 
 # Run the current pillowfight client
-pillowfight_current:
+pillowfight_perf:
     image: 0x74696d/cbc-benchmark-perf
     mem_limit: 64g
     links:

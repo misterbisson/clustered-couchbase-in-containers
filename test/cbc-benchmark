@@ -7,6 +7,7 @@ TIMINGS=${TIMINGS:-}
 QUERIES=${QUERIES:-30}
 CYCLES=${CYCLES:-468750000}
 TIMEOUT=${TIMEOUT:-5000000}
+EXTRA_ARGS=${EXTRA_ARGS:-}
 
 usage() {
     cat <<EOF
@@ -135,14 +136,13 @@ pillowfight() {
                          --set-pct=100 \
                          --batch-size=50 \
                          --rate-limit=20000 \
-                         --tokens=275 \
                          --no-population \
                          --sequential \
-                         --durability \
                          --timeout=${TIMEOUT} \
                          --num-cycles=${CYCLES} \
                          --key-prefix=${h:0:4} \
-                         -U couchbase://${IP}/benchmark
+                         -U couchbase://${IP}/benchmark \
+                         ${EXTRA_ARGS}
     sleep 1
     done
 }
