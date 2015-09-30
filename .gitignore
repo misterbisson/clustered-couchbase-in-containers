@@ -1,3 +1,5 @@
 test/.build-builder
 test/build
 test/.godeps
+test/.aws
+test/.gce

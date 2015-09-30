@@ -1,0 +1,71 @@
+# Using a single Consul host is _highly_ discouraged, but yolo
+consul:
+    image: progrium/consul:latest
+    command: -server -bootstrap-expect 1 -ui-dir /ui
+    ports:
+    - 53
+    - 8300
+    - 8301
+    - 8302
+    - 8400
+    - 8500:8500
+    restart: always
+
+
+# Manually bootstrap the first instance, then...
+# Scale this tier and each additional container/instance will automatically
+# self-configure as a member of the cluster
+couchbase4:
+    image: 0x74696d/triton-couchbase:4.0.0
+    extra_hosts:
+    - consul:${CONSUL_IP}
+    mem_limit: 128g
+    ports:
+    - 8091:8091
+    - 8092:8092
+    - 11207:11207
+    - 11210:11210
+    - 11211:11211
+    - 18091:18091
+    - 18092:18092
+    restart: always
+
+couchbase3:
+    image: misterbisson/triton-couchbase
+    extra_hosts:
+    - consul:${CONSUL_IP}
+    mem_limit: 128g
+    ports:
+    - 8091:8091
+    - 8092:8092
+    - 11207:11207
+    - 11210:11210
+    - 11211:11211
+    - 18091:18091
+    - 18092:18092
+    restart: always
+
+# Run the pillowfight client built from the durablity_tokens branch
+pillowfight_durable:
+    image: 0x74696d/cbc-benchmark-durable
+    mem_limit: 64g
+    extra_hosts:
+    - consul:${CONSUL_IP}
+    environment:
+    - ITEMS=93750000
+    - THREADS=20
+    - TIMEOUT=10000000
+    - EXTRA_ARGS=--tokens=275 --durability
+    command: /bin/cbc-benchmark pillowfight
+
+# Run the current pillowfight client
+pillowfight_perf:
+    image: 0x74696d/cbc-benchmark-perf
+    mem_limit: 64g
+    extra_hosts:
+    - consul:${CONSUL_IP}
+    environment:
+    - ITEMS=93750000
+    - THREADS=20
+    - TIMEOUT=10000000
+    command: /bin/cbc-benchmark pillowfight
