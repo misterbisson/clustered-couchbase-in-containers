@@ -38,14 +38,14 @@ ship: build
 	docker push 0x74696d/cbc-benchmark-perf
 
 # ------------------------------------------------------
-# docker-machine / swarm tasks for running on AWS/GCE
+# docker-machine / swarm tasks for running on AWS
 # Make sure your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment
 # variables have been set.
 # You'll also need the awscli installed: https://aws.amazon.com/cli/
 
 aws: .aws/consul .aws/machines
 	@echo All machines ready. To configure your Docker client run:
-	@echo 'eval "$$(docker-machine env --swarm swarm-master)"'
+	@echo 'eval "$$(docker-machine env --swarm swarm-aws-master)"'
 
 # initialize the swarm
 .aws/swarm:
@@ -54,13 +54,13 @@ aws: .aws/consul .aws/machines
 
 # Create the swarm master in your local Virtualbox environment
 .aws/master: .aws/swarm
-	-docker-machine rm swarm-master
+	-docker-machine rm swarm-master-aws
 	docker-machine create \
 		-d virtualbox \
 		--swarm \
 		--swarm-master \
 		--swarm-discovery token://$(shell cat .aws/swarm) \
-		swarm-master
+		swarm-aws-master
 	touch .aws/master
 
 # Set up and get info about the AWS environment.
@@ -101,24 +101,92 @@ aws: .aws/consul .aws/machines
 		--amazonec2-subnet-id $(shell cat .aws/subnet) \
 		--amazonec2-vpc-id $(shell cat .aws/vpc) \
 		--swarm-discovery token://$(shell cat .aws/swarm) \
-		swarm-consul
+		swarm-aws-consul
 	docker-machine ip swarm-consul > .aws/consul
 
 # Dynamically generate a list of jobs to create VMs and add these to
 # our swarm
-VMS := $(shell seq 1 10)
-VM_JOBS := $(addprefix machine,${VMS})
-.aws/machines: ${VM_JOBS}
-${VM_JOBS}: machine%:
+AWS_VMS := $(shell seq 1 10)
+AWS_VM_JOBS := $(addprefix aws-machine,${AWS_VMS})
+.aws/machines: ${AWS_VM_JOBS}
+${AWS_VM_JOBS}: aws-machine%:
 	docker-machine create \
 		-d amazonec2 \
 		--swarm \
 		--amazonec2-instance-type m4.4xlarge \
 		--amazonec2-region us-east-1 \
 		--amazonec2-security-group docker-machine \
+		--amazonec2-spot-price 1.00 \
 		--amazonec2-subnet-id $(shell cat .aws/subnet) \
 		--amazonec2-vpc-id $(shell cat .aws/vpc) \
 		--swarm-discovery token://$(shell cat .aws/swarm) \
-		swarm-$*
+		swarm-aws-$*
 
-.PHONY: clean .aws/machines ${VM_JOBS}
+
+# ------------------------------------------------------
+# docker-machine / swarm tasks for running on GCE
+# Make sure you have gcloud compute tools set up with a default
+# project. When machines are launched your browser will launch
+# asking you to verify the OAuth permissions
+
+gce: .gce/consul # .gce/machines
+	@echo All machines ready. To configure your Docker client run:
+	@echo 'eval "$$(docker-machine env --swarm swarm-master-gce)"'
+
+# initialize the swarm
+.gce/swarm:
+	mkdir -p .gce
+	docker run --rm swarm create > .gce/swarm
+
+# Create the swarm master in your local Virtualbox environment
+.gce/master: .gce/swarm
+	-docker-machine rm swarm-master-gce
+	docker-machine create \
+		-d virtualbox \
+		--swarm \
+		--swarm-master \
+		--swarm-discovery token://$(shell cat .gce/swarm) \
+		swarm-master-gce
+	@touch .gce/master
+
+# Set up and get info about the GCE environment.
+# This sets up a firewall rule that allows communication on ssh, 8092 (CB console),
+# and 8500 (consul) from your current IP.
+.gce/gce: .gce/network
+	gcloud info --format flattened | awk '/config.project/{print $$2}' > .gce/gce
+.gce/network:
+	gcloud compute firewall-rules create remote-access \
+		--allow tcp:22,tcp:8092,tcp:2376,tcp:8500 --network default \
+		--source-ranges $(shell curl http://ifconfig.co)/32
+	@touch .gce/network
+
+# Create the VM where we're going to run consul and register it to swarm.
+# We need to capture the machine's IP so that we can pass this value to
+# docker-compose so CB nodes can find consul.
+.gce/consul: .gce/master .gce/gce
+	docker-machine create \
+		-d google \
+		--swarm \
+		--google-machine-type n1-standard-1 \
+		--google-project $(shell cat .gce/gce) \
+		--swarm-discovery token://$(shell cat .gce/swarm) \
+		swarm-gce-consul
+	docker-machine ip swarm-gce-consul > .gce/consul
+
+# Dynamically generate a list of jobs to create VMs and add these to
+# our swarm
+GCE_VMS := $(shell seq 1 10)
+GCE_VM_JOBS := $(addprefix gce-machine,${GCE_VMS})
+.gce/machines: ${GCE_VM_JOBS}
+${GCE_VM_JOBS}: gce-machine%:
+	docker-machine create \
+		-d google \
+		--swarm \
+		--google-machine-type n1-standard-16 \
+		--google-project $(shell cat .gce/gce) \
+		--swarm-discovery token://$(shell cat .gce/swarm) \
+		swarm-gce-$*
+
+# ------------------------------------------------------
+
+.PHONY: clean .aws/machines .gce/machines ${AWS_VM_JOBS} ${GCE_VM_JOBS}
