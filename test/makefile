@@ -102,7 +102,7 @@ aws: .aws/consul .aws/machines
 		--amazonec2-vpc-id $(shell cat .aws/vpc) \
 		--swarm-discovery token://$(shell cat .aws/swarm) \
 		swarm-aws-consul
-	docker-machine ip swarm-consul > .aws/consul
+	docker-machine ip swarm-aws-consul > .aws/consul
 
 # Dynamically generate a list of jobs to create VMs and add these to
 # our swarm
@@ -113,7 +113,8 @@ ${AWS_VM_JOBS}: aws-machine%:
 	docker-machine create \
 		-d amazonec2 \
 		--swarm \
-		--amazonec2-instance-type m4.4xlarge \
+		--amazonec2-instance-type m2.4xlarge \
+		--amazonec2-ami ami-e3b9fc86 \
 		--amazonec2-region us-east-1 \
 		--amazonec2-security-group docker-machine \
 		--amazonec2-spot-price 1.00 \
