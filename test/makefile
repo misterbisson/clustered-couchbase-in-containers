@@ -212,5 +212,58 @@ ${GCE_HOSTS_JOBS}: gce-hosts%:
 
 
 # ------------------------------------------------------
+# docker-machine / swarm tasks for running on DO
+# Make sure you have a DO_TOKEN environment variable set
+
+do: .do/consul .do/machines
+	@echo All machines ready. To configure your Docker client run:
+	@echo 'eval "$$(docker-machine env --swarm swarm-do-master)"'
+
+# initialize the swarm
+.do/swarm:
+	mkdir -p .do
+	docker run --rm swarm create > .do/swarm
+
+# Create the swarm master in your local Virtualbox environment
+.do/master: .do/swarm
+	-docker-machine rm swarm-do-master
+	docker-machine create \
+		-d virtualbox \
+		--swarm \
+		--swarm-master \
+		--swarm-discovery token://$(shell cat .do/swarm) \
+		swarm-do-master
+	@touch .do/master
+
+# Create the VM where we're going to run consul and register it to swarm.
+# We need to capture the machine's IP so that we can pass this value to
+# docker-compose so CB nodes can find consul.
+.do/consul: .do/master
+	docker-machine create \
+		-d digitalocean \
+		--swarm \
+		--digitalocean-access-token ${DO_TOKEN} \
+		--digitalocean-private-networking true \
+		--digitalocean-size 512mb \
+		--swarm-discovery token://$(shell cat .do/swarm) \
+		swarm-do-consul
+	docker-machine ip swarm-do-consul > .do/consul
+
+# Dynamically generate a list of jobs to create VMs and add these to
+# our swarm
+DO_VMS := $(shell seq 1 10)
+DO_VM_JOBS := $(addprefix do-machine,${DO_VMS})
+.do/machines: ${DO_VM_JOBS}
+${DO_VM_JOBS}: do-machine%:
+	docker-machine create \
+		-d digitalocean \
+		--swarm \
+		--digitalocean-access-token ${DO_TOKEN} \
+		--digitalocean-private-networking true \
+		--digitalocean-size 64gb \
+		--swarm-discovery token://$(shell cat .do/swarm) \
+		swarm-do-$*
+
+# ------------------------------------------------------
 
 .PHONY: clean .aws/machines .gce/machines .do/machines ${AWS_VM_JOBS} ${GCE_VM_JOBS} ${DO_VM_JOBS}
