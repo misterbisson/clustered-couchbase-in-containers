@@ -141,7 +141,7 @@ ${AWS_HOSTS_JOBS}: aws-hosts%:
 
 gce: .gce/consul # .gce/machines
 	@echo All machines ready. To configure your Docker client run:
-	@echo 'eval "$$(docker-machine env --swarm swarm-master-gce)"'
+	@echo 'eval "$$(docker-machine env --swarm swarm-gce-master)"'
 
 # initialize the swarm
 .gce/swarm:
@@ -150,13 +150,13 @@ gce: .gce/consul # .gce/machines
 
 # Create the swarm master in your local Virtualbox environment
 .gce/master: .gce/swarm
-	-docker-machine rm swarm-master-gce
+	-docker-machine rm swarm-gce-master
 	docker-machine create \
 		-d virtualbox \
 		--swarm \
 		--swarm-master \
 		--swarm-discovery token://$(shell cat .gce/swarm) \
-		swarm-master-gce
+		swarm-gce-master
 	@touch .gce/master
 
 # Set up and get info about the GCE environment.
@@ -197,6 +197,20 @@ ${GCE_VM_JOBS}: gce-machine%:
 		--swarm-discovery token://$(shell cat .gce/swarm) \
 		swarm-gce-$*
 
+GCE_HOSTS_JOBS := $(addprefix gce-hosts,${GCE_VMS})
+.gce/hosts: ${GCE_HOSTS_JOBS}
+${GCE_HOSTS_JOBS}: gce-hosts%:
+	docker-machine ssh swarm-gce-$* 'echo $(shell cat .gce/consul) consul | sudo tee --append /etc/hosts'
+
+.gce/run-consul:
+	docker-compose -f ../docker-compose-swarm.yml -p cb4 up -d consul
+
+.gce/run-couchbase:
+	sed -r "s/consul:<CONSUL_IP>/consul:$(shell cat .gce/consul)/" \
+		../docker-compose-swarm.yml > /tmp/swarm.yml
+	COMPOSE=/tmp/swarm.yml PREFIX=cb4 VERSION=4 ../start.bash
+
+
 # ------------------------------------------------------
 
-.PHONY: clean .aws/machines .gce/machines ${AWS_VM_JOBS} ${GCE_VM_JOBS}
+.PHONY: clean .aws/machines .gce/machines .do/machines ${AWS_VM_JOBS} ${GCE_VM_JOBS} ${DO_VM_JOBS}
