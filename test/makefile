@@ -54,7 +54,7 @@ aws: .aws/consul .aws/machines
 
 # Create the swarm master in your local Virtualbox environment
 .aws/master: .aws/swarm
-	-docker-machine rm swarm-master-aws
+	-docker-machine rm swarm-aws-master
 	docker-machine create \
 		-d virtualbox \
 		--swarm \
@@ -123,6 +123,15 @@ ${AWS_VM_JOBS}: aws-machine%:
 		--swarm-discovery token://$(shell cat .aws/swarm) \
 		swarm-aws-$*
 
+AWS_HOSTS_JOBS := $(addprefix aws-hosts,${AWS_VMS})
+.aws/hosts: ${AWS_HOSTS_JOBS}
+${AWS_HOSTS_JOBS}: aws-hosts%:
+	docker-machine ssh swarm-aws-$* 'echo $(shell cat .aws/consul) consul | sudo tee --append /etc/hosts'
+
+.aws/couchbase:
+	sed -r "s/consul:<CONSUL_IP>/consul:$(shell cat .aws/consul)/" \
+		../docker-compose-swarm.yml > /tmp/swarm.yml
+	COMPOSE=/tmp/swarm.yml PREFIX=cb4 VERSION=4 ../start.bash
 
 # ------------------------------------------------------
 # docker-machine / swarm tasks for running on GCE

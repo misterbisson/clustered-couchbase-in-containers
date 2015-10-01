@@ -2,6 +2,7 @@
 consul:
     image: progrium/consul:latest
     command: -server -bootstrap-expect 1 -ui-dir /ui
+    net: host
     ports:
     - 53
     - 8300
@@ -11,15 +12,19 @@ consul:
     - 8500:8500
     restart: always
 
+# Run the application on AWS/GCE as follows:
+# sed -r "s/consul:<CONSUL_IP>/consul:$(shell cat .aws/consul)/" ../docker-compose-swarm.yml > /tmp/swarm.yml
+# COMPOSE=/tmp/swarm.yml PREFIX=cb4 VERSION=4 ../start.bash
 
 # Manually bootstrap the first instance, then...
 # Scale this tier and each additional container/instance will automatically
 # self-configure as a member of the cluster
 couchbase4:
     image: 0x74696d/triton-couchbase:4.0.0
+    net: host
     extra_hosts:
-    - consul:${CONSUL_IP}
-    mem_limit: 128g
+    - "consul:<CONSUL_IP>"
+    mem_limit: 60g
     ports:
     - 8091:8091
     - 8092:8092
@@ -32,9 +37,10 @@ couchbase4:
 
 couchbase3:
     image: misterbisson/triton-couchbase
+    net: host
     extra_hosts:
-    - consul:${CONSUL_IP}
-    mem_limit: 128g
+    - "consul:<CONSUL_IP>"
+    mem_limit: 60g
     ports:
     - 8091:8091
     - 8092:8092
@@ -48,9 +54,9 @@ couchbase3:
 # Run the pillowfight client built from the durablity_tokens branch
 pillowfight_durable:
     image: 0x74696d/cbc-benchmark-durable
-    mem_limit: 64g
+    mem_limit: 16g
     extra_hosts:
-    - consul:${CONSUL_IP}
+    - "consul:<CONSUL_IP>"
     environment:
     - ITEMS=93750000
     - THREADS=20
@@ -61,9 +67,9 @@ pillowfight_durable:
 # Run the current pillowfight client
 pillowfight_perf:
     image: 0x74696d/cbc-benchmark-perf
-    mem_limit: 64g
+    mem_limit: 16g
     extra_hosts:
-    - consul:${CONSUL_IP}
+    - "consul:<CONSUL_IP>"
     environment:
     - ITEMS=93750000
     - THREADS=20

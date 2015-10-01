@@ -28,7 +28,7 @@ while [ $COUCHBASERESPONSIVE != 1 ]; do
     RUNNING=$(docker inspect ${PREFIX}_couchbase${VERSION}_1 | json -a State.Running)
     if [ "$RUNNING" == "true" ]
     then
-        docker exec -it ${PREFIX}_couchbase${VERSION}_1 triton-bootstrap bootstrap benchmark
+        docker exec ${PREFIX}_couchbase${VERSION}_1 triton-bootstrap bootstrap benchmark
         let COUCHBASERESPONSIVE=1
     else
         sleep 1.3
