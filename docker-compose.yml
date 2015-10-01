@@ -12,6 +12,8 @@ consul:
     - 8302
     - 8400
     - 8500
+    dns:
+       - 127.0.0.1
     restart: always
 
 #
@@ -19,7 +21,7 @@ consul:
 # Scale this tier and each additional container/instance will automatically self-configure as a member of the cluster
 #
 couchbase:
-    image: misterbisson/triton-couchbase
+    image: misterbisson/triton-couchbase:enterprise-3.0.3-r2
     links:
     - consul
     mem_limit: 4096m

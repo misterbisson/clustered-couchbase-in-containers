@@ -32,6 +32,12 @@ while [ $COUCHBASERESPONSIVE != 1 ]; do
 done
 echo
 
+CONSUL="$(sdc-listmachines | json -aH -c "'"$PREFIX"_consul_1' == this.name" ips.1):8500"
+echo
+echo 'Consul is now running'
+echo "Dashboard: $CONSUL"
+command -v open >/dev/null 2>&1 && `open http://$CONSUL/ui/`
+
 CBDASHBOARD="$(sdc-listmachines | json -aH -c "'"$PREFIX"_couchbase_1' == this.name" ips.1):8091"
 echo
 echo 'Couchbase cluster running and bootstrapped'
