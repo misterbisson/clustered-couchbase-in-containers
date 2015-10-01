@@ -166,8 +166,11 @@ gce: .gce/consul # .gce/machines
 	gcloud info --format flattened | awk '/config.project/{print $$2}' > .gce/gce
 .gce/network:
 	gcloud compute firewall-rules create remote-access \
-		--allow tcp:22,tcp:8092,tcp:2376,tcp:8500 --network default \
+		--allow tcp:22,tcp:8091,tcp:8092,tcp:2376 --network default \
 		--source-ranges $(shell curl http://ifconfig.co)/32
+	gcloud compute firewall-rules create remote-access \
+		--allow tcp:8500 --network default \
+		--source-ranges 0.0.0.0/0
 	@touch .gce/network
 
 # Create the VM where we're going to run consul and register it to swarm.
