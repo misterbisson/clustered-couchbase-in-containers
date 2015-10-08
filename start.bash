@@ -48,7 +48,7 @@ command -v open >/dev/null 2>&1 && `open http://$CBDASHBOARD/index.html#sec=serv
 
 echo
 echo 'Scaling Couchbase cluster to three nodes'
-echo 'docker-compose --project-name=$PREFIX scale couchbase=3'
+echo "docker-compose --project-name="$PREFIX" scale couchbase=3"
 docker-compose --project-name=$PREFIX scale couchbase=3
 
 echo

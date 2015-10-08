@@ -21,7 +21,7 @@ consul:
 # Scale this tier and each additional container/instance will automatically self-configure as a member of the cluster
 #
 couchbase:
-    image: misterbisson/triton-couchbase:enterprise-3.0.3-r2
+    image: misterbisson/triton-couchbase:enterprise-3.0.3-r3
     links:
     - consul
     mem_limit: 4096m
