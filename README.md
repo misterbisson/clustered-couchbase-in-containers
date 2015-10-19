@@ -18,13 +18,13 @@ curl -O https://raw.githubusercontent.com/joyent/sdc-docker/master/tools/sdc-doc
 
 1. [Clone](git@github.com:misterbisson/clustered-couchbase-in-containers.git) or [download](https://github.com/misterbisson/clustered-couchbase-in-containers/archive/master.zip) this repo.
 1. `cd` into the cloned or downloaded directory.
-1. Execute `bash start.bash` to start everything up.
-1. The Couchbase dashboard should automatically open. Sign in with the user/pass printed in the output of `bash start.bash` to see the working, one-node cluster.
+1. Execute `bash start.sh` to start everything up.
+1. The Couchbase dashboard should automatically open. Sign in with the user/pass printed in the output of `bash start.sh` to see the working, one-node cluster.
 1. Scale the cluster using `docker-compose --project-name=ccic scale up couchbase=$n` and watch the node(s) join the cluster in the Couchbase dashboard.
 
 ## Detailed instructions
 
-The [`start.bash` script](https://github.com/misterbisson/clustered-couchbase-in-containers/blob/master/start.bash) automatically does the following:
+The [`start.sh` script](https://github.com/misterbisson/clustered-couchbase-in-containers/blob/master/start.sh) automatically does the following:
 
 ```bash
 docker-compose pull
@@ -41,7 +41,7 @@ The three services include:
 
 Consul is running in it's default configuration as delivered in [Jeff Lindsay's excellent image](https://registry.hub.docker.com/u/progrium/consul/), but Couchbase is wrapped with a [custom start script that enables the magic here](https://github.com/misterbisson/triton-couchbase/blob/master/bin/triton-bootstrap).
 
-Once the first set of containers is running, the `start.bash` script bootstraps the Couchbase container with the following command:
+Once the first set of containers is running, the `start.sh` script bootstraps the Couchbase container with the following command:
 
 ```bash
 docker exec -it ccic_couchbase_1 triton-bootstrap bootstrap benchmark
