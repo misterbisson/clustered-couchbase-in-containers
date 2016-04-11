@@ -1,3 +1,9 @@
+# Note: Updated Instructions and Images Available!
+
+Please see https://github.com/autopilotpattern/couchbase for the latest instructions on how to run Couchbase in Docker.
+
+This repo is preserved for historical purposes only.
+
 # Couchbase cluster in Docker containers
 
 This is a Docker Compose file and shell script that will deploy a Couchbase cluster that can be scaled easily using `docker compose scale couchbase=$n`.
